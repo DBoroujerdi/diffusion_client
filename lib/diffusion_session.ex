@@ -26,14 +26,16 @@ defmodule Diffusion.Session do
 
   @spec connect(pid, number, config) :: {:ok, Diffusion.Session.t} when config: [connection_conf]
 
-  def connect(pid, timeout, config) when is_pid(pid) do
-    GenServer.cast(pid, {:connect, config |> Enum.into(%{})})
+  def connect(pid, _timeout, config) when is_pid(pid) do
+    # todo: should the timeout value be passed into
+    # the process then to gun somehow?
+    GenServer.call(pid, {:connect, config |> Enum.into(%{})})
 
-    receive do
-      session -> session
-    after timeout ->
-        Error.fail("timed out establishing websocket")
-    end
+    # receive do
+    #   session -> session
+    # after timeout ->
+    #     Error.fail("timed out establishing websocket")
+    # end
   end
 
 
@@ -62,15 +64,11 @@ defmodule Diffusion.Session do
 
   ##
 
-  def handle_info({:gun_ws_upgrade, connection, :ok, _}, %{owner: owner} = state) do
-    case Process.send(owner, {:ok, %Diffusion.Session{pid: self()}}, []) do
-      :ok ->
-        {:noreply, Map.put(state, :connection, connection)}
-      error ->
-        {:stop, {:notify_owner_failure, error}}
-    end
-  end
 
+
+  def handle_info({'DOWN', mref, :process, _, reason}, %{mref: mref}) do
+    {:stop, {:connection_down, reason}}
+  end
 
   def handle_info({:gun_ws, _pid, {:text, data}}, %{connection: connection} = state) do
     Logger.info "Received -> #{data}"
@@ -78,7 +76,7 @@ defmodule Diffusion.Session do
     case is_timestamp(data) do
       true ->
         # ping back
-        ok = :gun.ws_send(connection, {:text, data})
+        :ok = :gun.ws_send(connection, {:text, data})
       false ->
         # todo: pass message to call back of send to owner process
     end
@@ -86,12 +84,19 @@ defmodule Diffusion.Session do
     {:noreply, state}
   end
 
-  def handle_info({'DOWN', mref, :process, _, reason}, %{mref: mref}), do:
-    {:stop, {:connection_down, reason}}
-  def handle_call(:get_id, _, %{id: id} = state), do:
+
+  def handle_call({:connect, config}, _, state) do
+    case open_websocket(config) do
+      {:ok, connection} ->
+        new_state = %{mref: Process.monitor(connection), connection: connection}
+        {:reply, {:ok, %Diffusion.Session{pid: self()}}, Map.merge(new_state, state)}
+      error ->
+        {:reply, error, state}
+    end
+  end
+
+  def handle_call(:get_id, _, %{id: id} = state) do
     {:reply, id, state}
-  def handle_call(args, _, state) do
-    {:reply, args, state}
   end
 
   ##
@@ -100,17 +105,6 @@ defmodule Diffusion.Session do
     :ok = :gun.ws_send(connection, {:binary, command})
     {:noreply, state}
   end
-
-  def handle_cast({:connect, config}, state) do
-    case open_websocket(config) do
-      {:ok, connection} ->
-        new_state = %{mref: Process.monitor(connection), connection: connection}
-        {:noreply, Map.merge(new_state, state)}
-      error ->
-        {:stop, error}
-    end
-  end
-
 
   def handle_cast({:push, item}, state) do
     {:noreply, [item | state]}
@@ -147,9 +141,12 @@ defmodule Diffusion.Session do
   defp upgrade_to_ws(connection, %{path: path}) do
     _ = :gun.ws_upgrade(connection, path)
 
-    # todo: should we wait and block process the process while waiting for the upgrade
-    # the process has no use when in a http connection state
-    {:ok, connection}
+    receive do
+      {:gun_ws_upgrade, ^connection, :ok, _} ->
+        {:ok, connection}
+      other ->
+        {:error, {:unexpected_message, other}}
+    end
   end
 
   defp open_connection(%{host: host, port: port}) do
@@ -171,4 +168,5 @@ defmodule Diffusion.Session do
     false
   end
 
+  # implement on terminate so we can close the gun process gracefully
 end
