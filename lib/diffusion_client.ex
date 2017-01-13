@@ -29,7 +29,7 @@ defmodule Diffusion.Client do
     # todo: option validation?
     case Diffusion.SessionSupervisor.start_child(opts) do
       {:ok, pid} ->
-        Diffusion.Session.connect(pid, timeout, host: host, port: port, path: path)
+        Diffusion.Session.connect(pid, host: host, port: port, path: path, timeout: timeout)
       error -> error
     end
   end

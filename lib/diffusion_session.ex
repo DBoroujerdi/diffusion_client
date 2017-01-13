@@ -11,7 +11,7 @@ defmodule Diffusion.Session do
   defstruct [:pid]
   # todo: expand this struct with additional useful session information
   @type t :: %__MODULE__{pid: pid}
-  @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t}
+  @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number}
 
 
   # API
@@ -24,18 +24,10 @@ defmodule Diffusion.Session do
   end
 
 
-  @spec connect(pid, number, config) :: {:ok, Diffusion.Session.t} when config: [connection_conf]
+  @spec connect(pid, config) :: {:ok, Diffusion.Session.t} when config: [connection_conf]
 
-  def connect(pid, _timeout, config) when is_pid(pid) do
-    # todo: should the timeout value be passed into
-    # the process then to gun somehow?
+  def connect(pid, config) when is_pid(pid) do
     GenServer.call(pid, {:connect, config |> Enum.into(%{})})
-
-    # receive do
-    #   session -> session
-    # after timeout ->
-    #     Error.fail("timed out establishing websocket")
-    # end
   end
 
 
@@ -111,7 +103,9 @@ defmodule Diffusion.Session do
   end
 
 
+  ##
   ## private functions
+  ##
 
   defp handle_connection_error(error, connection) do
     _ = :gun.close(connection)
@@ -135,7 +129,7 @@ defmodule Diffusion.Session do
   defp wait_up(connection, config) do
     Error.p do
       {:ok, connection}
-      |> await_up()
+      |> await_up(config)
       |> upgrade_to_ws(config)
     end
   end
@@ -157,8 +151,8 @@ defmodule Diffusion.Session do
   end
 
 
-  defp await_up(connection) do
-    case :gun.await_up(connection) do
+  defp await_up(connection, %{timeout: timeout}) do
+    case :gun.await_up(connection, timeout) do
       {:ok, _} -> {:ok, connection}
       error -> error
     end
