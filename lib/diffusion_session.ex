@@ -113,25 +113,28 @@ defmodule Diffusion.Session do
 
   ## private functions
 
+  defp handle_connection_error(error, connection) do
+    _ = :gun.close(connection)
+    error
+  end
+
+
   defp open_websocket(config) do
     case open_connection(config) do
-      {:ok, connection} = ok ->
-        case wait_up(ok, config) do
-          {:ok, _} -> ok
-          error ->
-            # close connection if anything goes wrong
-            # whilst waiting for the connection to ws
-            # to establish
-            _ = :gun.close(connection)
-            error
+      {:ok, connection} ->
+        with {:ok, _} = wait_up(connection, config)
+          do {:ok, connection}
+          else
+            error -> handle_connection_error(error, connection)
         end
+      error -> error
     end
   end
 
 
   defp wait_up(connection, config) do
     Error.p do
-      connection
+      {:ok, connection}
       |> await_up()
       |> upgrade_to_ws(config)
     end
