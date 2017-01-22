@@ -2,6 +2,8 @@
 
 **TODO: Add description**
 
+# todo: shouldn't be able to connect to the same server more than once
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
@@ -21,4 +23,3 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
       [applications: [:diffusion_client]]
     end
     ```
-

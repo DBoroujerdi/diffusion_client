@@ -1,6 +1,6 @@
 defmodule DiffusionClientTest do
   use ExUnit.Case
-  doctest DiffusionClient
+  doctest Diffusion.Client
 
   test "the truth" do
     assert 1 + 1 == 2

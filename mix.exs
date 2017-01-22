@@ -23,10 +23,10 @@ defmodule DiffusionClient.Mixfile do
     [
       {:gun, git: "https://github.com/ninenines/gun.git"},
       {:gproc, git: "https://github.com/uwiger/gproc.git"},
-      {:diffusion_protocol, git: "https://github.com/DBoroujerdi/diffusion_protocol.git"},
       {:uuid, "~> 1.1"},
       {:monad, "~> 1.0"},
-      {:dialyxir, "~> 0.4", only: [:dev], runtime: false}
+      {:dialyxir, "~> 0.4", only: [:dev], runtime: false},
+      {:ex_spec, "~> 2.0", only: :test}
     ]
   end
 end
