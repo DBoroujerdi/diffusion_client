@@ -51,10 +51,10 @@ defmodule Diffusion.Client do
           bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
           Connection.send(connection, bin)
           receive do
-            {:topic_loaded, topic} -> :ok
+            {:topic_loaded, ^topic} -> :ok
             other -> {:error, {:unexpected_message, other}}
           after timeout
-            -> {:error, :timeout}
+              -> {:error, :timeout}
           end
         error -> error
       end
