@@ -1,6 +1,8 @@
 require Logger
 
 defmodule Diffusion.TopicHandler do
+  alias Diffusion.Router
+
   use GenServer
 
   # Client API
@@ -21,15 +23,14 @@ defmodule Diffusion.TopicHandler do
       nil ->
         {:stop, "missing topic arg"}
       {:topic, topic} ->
-        Logger.debug "Registering for topic events for #{inspect topic}"
-        :gproc.reg({:p, :l, {:topic_event, topic}})
+        Router.subscribe(topic)
         {:ok, args |> Enum.into(%{})}
     end
   end
 
   def handle_cast({:topic_loaded, topic_alias}, %{owner: owner, topic: topic} = state) do
     Logger.info "Topic loaded: #{inspect topic}"
-    :gproc.reg({:p, :l, {:topic_event, topic_alias}})
+    Router.subscribe(topic_alias)
     send owner, {:topic_loaded, topic}
     {:noreply, state}
   end

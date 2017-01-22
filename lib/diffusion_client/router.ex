@@ -24,52 +24,48 @@ defmodule Diffusion.Router do
     GenServer.cast(@server, {:message, self(), bin})
   end
 
+  def subscribe(key) do
+    Logger.debug "#{inspect self()}: subscribing for events #{inspect key}"
+    :gproc.reg({:p, :l, {:topic_event, key}})
+  end
+
   # Server callbacks
   def init(:ok) do
-    {:ok, %{}}
+    {:ok, :ok}
   end
 
-  def handle_cast({:message, connection, message}, state) do
-    {:noreply, handle(connection, message, state)}
-  end
-
-
-
-  defp handle(connection, message, state) do
+  def handle_cast({:message, connection, message}, _) do
     try do
-      case Protocol.decode(message) do
-        %DataMessage{type: 25} = msg ->
-          Connection.send(connection, message)
-          state
-        %DataMessage{type: 20, headers: [topic_headers]} = msg ->
-          Logger.debug "Topic load msg #{inspect msg}"
-
-          # todo: this needs to be more elegant
-          case :binary.split(topic_headers, "!") do
-            [topic, topic_alias] ->
-              TopicHandler.handle(topic, {:topic_loaded, "!" <> topic_alias})
-              state
-            _ ->
-              raise {:error, {:malformed_headers, topic_headers}}
-          end
-        %DataMessage{type: 21, headers: [topic_alias|_tail]} = msg ->
-          TopicHandler.handle(topic_alias, {:topic_delta, msg})
-          state
-        %DataMessage{} = msg ->
-          Logger.info "data msg #{inspect msg}"
-          state
-        %ConnectionResponse{} ->
-          Logger.info "connection response"
-          state
-        msg ->
-          Logger.error "unexpected msg #{inspect msg}"
-          state
-      end
+      Protocol.decode(message) |> maybe_route(connection)
     rescue
       e in RuntimeError ->
         Logger.error("An error occurred: " <> e.message)
-      {:no_reply, state}
     end
+    {:noreply, :ok}
+  end
 
+  defp maybe_route(message, connection) do
+    case message do
+      %DataMessage{type: 25} ->
+        Connection.send(connection, Protocol.encode(message))
+      %DataMessage{type: 20, headers: [topic_headers]} = msg ->
+        Logger.debug "Topic load msg #{inspect msg}"
+
+        # todo: this needs to be more elegant
+        case :binary.split(topic_headers, "!") do
+          [topic, topic_alias] ->
+            TopicHandler.handle(topic, {:topic_loaded, "!" <> topic_alias})
+          _ ->
+            Logger.error "error parsing headers [#{inspect topic_headers}]"
+        end
+      %DataMessage{type: 21, headers: [topic_alias|_tail]} = msg ->
+        TopicHandler.handle(topic_alias, {:topic_delta, msg})
+      %DataMessage{} = msg ->
+        Logger.debug "data msg #{inspect msg}"
+      %ConnectionResponse{} ->
+        Logger.debug "connection response"
+      msg ->
+        Logger.error "unexpected msg #{inspect msg}"
+    end
   end
 end
