@@ -68,6 +68,13 @@ defmodule Diffusion.Websocket.ProtocolTest do
       assert actual == expected
     end
 
+    it "encodes logon command" do
+      data = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: "pass\u{02}password"}
+      actual = Protocol.encode(data)
+      expected = "\u{15}Commands\u{02}0\u{02}LOGON\u{01}pass\u{02}password"
+      assert actual == expected
+    end
+
     it "encodes connection response" do
       data = %ConnectionResponse{type: 100, client_id: "C8D4048FA5712A3A-006740E900000004", version: 4}
       actual = Protocol.encode(data)

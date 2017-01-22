@@ -3,10 +3,9 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.Session
-  alias Diffusion.Supervisor
-
-  alias Diffusion.Websocket.Protocol.DataMessage, as: DataMessage
+  alias Diffusion.{Connection, ConnectionSup, TopicHandlerSup}
+  alias Diffusion.Websocket.Protocol
+  alias Protocol.DataMessage
 
 
   # API functions
@@ -17,14 +16,14 @@ defmodule Diffusion.Client do
   in all interactions with the client.
   """
 
-  @spec connect(String.t, number, opts) :: {:ok, Session.t} when opts: [atom: any]
+  @spec connect(String.t, number, opts) :: {:ok, pid} | {:error, any} when opts: [atom: any]
 
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."
 
-    with {:ok, pid} <- Supervisor.start_child(opts),
+    with {:ok, pid} <- ConnectionSup.new_connection(host, opts),
          :valid <- validate_opts(opts)
-      do Session.connect(pid, host, port, path, timeout, opts)
+      do Connection.connect(pid, host, port, path, timeout, opts)
       else
         error -> error
     end
@@ -32,52 +31,63 @@ defmodule Diffusion.Client do
 
 
   @doc """
-  Subscribe to data stream for a command on a session.
+  Subscribe to topic delta stream.
 
   todo: command should be a proper data type here.
   todo: should return an erro case if subscription was not possible for some
   reason. maybe the topic doesn't exist
   """
 
-  # todo: can a module call be typed??
+  # todo: can a module callback be typed??
 
-  @spec add_topic(Session.t, binary, module) :: :ok | {:error, any}
+  @spec add_topic(pid, binary, module, pos_integer) :: :ok | {:error, any}
 
-  def add_topic(session, topic, callback) do
+  def add_topic(connection, topic, callback, timeout \\ 5000) do
     Logger.info "Adding topic to #{inspect topic} with callback #{inspect callback}"
 
-    if Process.alive?(session.pid) do
-      Session.add_topic(session, topic, callback)
+    if Process.alive?(connection) do
+      case TopicHandlerSup.new_handler(topic, self(), callback) do
+        {:ok, _} ->
+          bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
+          Connection.send(connection, bin)
+          receive do
+            {:topic_loaded, topic} -> :ok
+            other -> {:error, {:unexpected_message, other}}
+          after timeout
+            -> {:error, :timeout}
+          end
+        error -> error
+      end
     else
-      {:error, :no_local_process_found}
+      {:error, :connection_down}
     end
   end
 
 
-  @spec send(Session.t, DataMessage.t) :: :ok
+  @spec send(pid, DataMessage.t) :: :ok | {:error, :connection_down}
 
-  def send(session, data) do
-    if Process.alive?(session.pid) do
-      Session.send(session, data)
+  def send(connection, data) do
+    if Process.alive?(connection) do
+      Connection.send(connection, Protocol.encode(data))
     else
-      {:error, :no_local_process_found}
+      {:error, :connection_down}
     end
   end
 
 
   @doc """
-  Unsubscribe from subscribed stream.
-
-  todo: returns error is unsub failed
+  Close a connection. All topic subscriptions consuming from the connection
+  will also close as a result.
   """
 
-  @spec close_session(Session.t) :: :ok | {:error, any}
+  @spec close_session(pid) :: :ok | {:error, any}
 
-  def close_session(session) do
-    if Process.alive?(session.pid) do
-      Supervisor.stop_child(session)
+  def close_session(connection) do
+    if Process.alive?(connection) do
+      ConnectionSup.stop_child(connection)
+      # todo: close all topic subscriptions as well.
     else
-      {:error, :no_local_process_found}
+      {:error, :no_connection}
     end
   end
 
@@ -92,6 +102,9 @@ defmodule Diffusion.Client do
   def start(_, _) do
     Logger.info "Starting DiffusionClient"
 
+    # todo: support starting connection and subscriptions
+    # from config
+
     Diffusion.Supervisor.start_link()
   end
 
@@ -100,7 +113,7 @@ defmodule Diffusion.Client do
   ##
 
   defp validate_opts(_opts) do
-    # todo:
+    # todo: implement validation
     :valid
   end
 

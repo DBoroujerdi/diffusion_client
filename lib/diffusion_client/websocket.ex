@@ -73,6 +73,11 @@ defmodule Diffusion.Websocket do
     end
   end
 
+  defp upgrade_to_ws(connection, config) do
+    upgrade_to_ws(connection, Map.put(config, :headers, []))
+  end
+
+
 
   defp open_connection(%{host: host, port: port}) do
     :gun.open(String.to_charlist(host), port)

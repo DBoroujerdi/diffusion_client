@@ -8,12 +8,13 @@ defmodule Test do
   def test do
     {:ok, session} = Diffusion.Client.connect("demo.pushtechnology.com", 80, "/diffusion?t=Commands&v=4&ty=WB", 5000, [])
 
-    msg = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: ["pass", "password"]}
+    msg = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: "pass\u{02}password"}
     :ok = Diffusion.Client.send(session, msg)
 
     Diffusion.Client.add_topic(session, "Assets/FX/EURUSD/B", __MODULE__)
+    Diffusion.Client.add_topic(session, "Assets/FX/EURUSD/O", __MODULE__)
+    Diffusion.Client.add_topic(session, "Assets/FX/GBPUSD/B", __MODULE__)
 
-    session
   end
 
   def test2() do
