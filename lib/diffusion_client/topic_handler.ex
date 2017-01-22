@@ -10,7 +10,6 @@ defmodule Diffusion.TopicHandler do
   end
 
   def handle(topic, event) do
-    #:gproc.send({:p, :l, {:topic_event, topic}}, event)
     GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic}}}, event)
   end
 
@@ -28,8 +27,9 @@ defmodule Diffusion.TopicHandler do
     end
   end
 
-  def handle_cast(:topic_loaded, %{owner: owner, topic: topic} = state) do
+  def handle_cast({:topic_loaded, topic_alias}, %{owner: owner, topic: topic} = state) do
     Logger.info "Topic loaded: #{inspect topic}"
+    :gproc.reg({:p, :l, {:topic_event, topic_alias}})
     send owner, {:topic_loaded, topic}
     {:noreply, state}
   end
