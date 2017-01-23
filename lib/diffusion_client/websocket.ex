@@ -26,26 +26,15 @@ defmodule Diffusion.Websocket do
   def open_websocket(config) do
     case open_connection(config) do
       {:ok, connection} ->
-        case wait_up(connection, config) do
-          {:error, _} = error ->
-            close(connection)
-            error
-          connection -> connection
+        with {:ok, _} <- wait_up(connection, config)
+          do {:ok, connection}
+          else
+            error ->
+              close(connection)
+              error
         end
       error -> error
     end
-
-    # case open_connection(config) do
-    #   {:ok, connection} ->
-    #     with {:ok, _} <- wait_up(connection, config)
-    #       do {:ok, connection}
-    #       else
-    #         error ->
-    #           close(connection)
-    #           error
-    #     end
-    #   error -> error
-    # end
   end
 
 

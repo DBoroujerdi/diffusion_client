@@ -47,7 +47,7 @@ defmodule Diffusion.Router do
   defp maybe_route(message, connection) do
     case message do
       %DataMessage{type: 25} ->
-        Connection.send(connection, Protocol.encode(message))
+        Connection.send_data(connection, Protocol.encode(message))
       %DataMessage{type: 20, headers: [topic_headers]} = msg ->
         Logger.debug "Topic load msg #{inspect msg}"
 

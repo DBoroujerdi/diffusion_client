@@ -16,27 +16,24 @@ defmodule Diffusion.ConnectionSup do
   end
 
 
-  @spec new_connection(String.t, opts) :: Supervisor.on_start_child when opts: [{atom, any}]
+  @spec start_child(map) :: Supervisor.on_start_child
 
-  def new_connection(id, opts) do
-    worker = worker(Connection, [opts], [id: id, restart: :temporary])
+  def start_child(%{host: id} = config) do
+    worker = worker(Connection, [config], [id: id, restart: :permanent])
 
-    Logger.debug "Adding new connection with id [#{id}] with opts: #{opts}"
+    Logger.debug "Adding new connection with id [#{id}] with config: #{inspect config}"
 
     Supervisor.start_child(@module, worker)
   end
 
 
-  @spec stop_child(Session.t) :: :ok
-
-  def stop_child(_id) do
-    # todo:
-    :ok
+  def stop_child(pid) do
+    Supervisor.terminate_child(@module, pid)
   end
 
   def init(:ok) do
     Logger.debug "Connection supervisor started."
-    supervise([], strategy: :one_for_one, restart: :temporary)
+    supervise([], strategy: :one_for_one, restart: :permanent)
   end
 
 end

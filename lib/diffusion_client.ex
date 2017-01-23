@@ -21,11 +21,21 @@ defmodule Diffusion.Client do
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."
 
-    with {:ok, pid} <- ConnectionSup.new_connection(host, opts),
-         :valid <- validate_opts(opts)
-      do Connection.connect(pid, host, port, path, timeout, opts)
-      else
-        error -> error
+    case validate_opts(opts) do
+      :valid ->
+        case Connection.new(host, port, path, timeout, opts) do
+          {:ok, pid} = connection ->
+            receive do
+              :connected -> connection
+              error ->
+                Connection.close(pid)
+                error
+            after timeout
+                -> {:error, :timeout}
+            end
+          error -> error
+        end
+      invalid -> invalid
     end
   end
 
@@ -49,7 +59,7 @@ defmodule Diffusion.Client do
       case TopicHandlerSup.new_handler(topic, self(), callback) do
         {:ok, _} ->
           bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
-          Connection.send(connection, bin)
+          Connection.send_data(connection, bin)
           receive do
             {:topic_loaded, ^topic} -> :ok
             other -> {:error, {:unexpected_message, other}}
@@ -68,7 +78,7 @@ defmodule Diffusion.Client do
 
   def send(connection, data) do
     if Process.alive?(connection) do
-      Connection.send(connection, Protocol.encode(data))
+      Connection.send_data(connection, Protocol.encode(data))
     else
       {:error, :connection_down}
     end
@@ -80,12 +90,11 @@ defmodule Diffusion.Client do
   will also close as a result.
   """
 
-  @spec close_session(pid) :: :ok | {:error, any}
+  @spec close_connection(pid) :: :ok | {:error, any}
 
-  def close_session(connection) do
+  def close_connection(connection) do
     if Process.alive?(connection) do
       ConnectionSup.stop_child(connection)
-      # todo: close all topic subscriptions as well.
     else
       {:error, :no_connection}
     end

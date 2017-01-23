@@ -8,7 +8,7 @@ defmodule Diffusion.TopicHandler do
   # Client API
   def start_link(args) do
     Logger.debug "start_link topic handler [#{inspect args}]"
-    GenServer.start_link(__MODULE__, args, [])
+    GenServer.start_link(__MODULE__, args |> Enum.into(%{}), [])
   end
 
   def handle(topic, event) do
@@ -16,16 +16,10 @@ defmodule Diffusion.TopicHandler do
   end
 
   # Server callbacks
-  def init(args) do
+  def init(%{topic: topic} = args) do
     Logger.debug "Started topic handler [#{inspect args}]"
-
-    case List.keyfind(args, :topic, 0) do
-      nil ->
-        {:stop, "missing topic arg"}
-      {:topic, topic} ->
-        Router.subscribe(topic)
-        {:ok, args |> Enum.into(%{})}
-    end
+    Router.subscribe(topic)
+    {:ok, args}
   end
 
   def handle_cast({:topic_loaded, topic_alias}, %{owner: owner, topic: topic} = state) do

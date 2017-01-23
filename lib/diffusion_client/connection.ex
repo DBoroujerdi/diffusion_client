@@ -1,18 +1,18 @@
 require Logger
 
 defmodule Diffusion.Connection do
-  alias Diffusion.{Websocket, Router}
+  alias Diffusion.{Websocket, Router, ConnectionSup}
 
   use GenServer
 
   @name __MODULE__
 
-  @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number}
+  @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
   defmodule State do
-    @type t :: %State{connection: pid, mref: identifier}
+    @type t :: %State{connection: pid, mref: identifier, owner: pid}
 
-    defstruct connection: nil, mref: nil
+    defstruct connection: nil, mref: nil, owner: nil
 
     def new do
       %State{}
@@ -29,20 +29,26 @@ defmodule Diffusion.Connection do
   end
 
 
-  @spec connect(pid, binary, number, binary, pos_integer, opts) :: {:ok, Diffusion.Session.t}
-        when opts: [connection_conf]
+  @spec new(binary, number, binary, pos_integer, opts) :: Supervisor.on_start_child
+        when opts: [{atom, any}]
 
-  def connect(pid, host, port, path, timeout, opts) when is_pid(pid) do
-    config = opts ++ [host: host, port: port, path: path, timeout: timeout]
+  def new(host, port, path, timeout, opts) do
+    config = opts ++ [host: host, port: port, path: path, timeout: timeout, owner: self()]
     |> Enum.into(%{})
 
-    GenServer.call(pid, {:connect, config})
+    ConnectionSup.start_child(config)
   end
 
 
-  @spec send(pid, String.t) :: :ok
+  def close(connection) when is_pid(connection) do
+    # todo: is this enough?
+    send connection, :kill
+  end
 
-  def send(pid, data) when is_binary(data) do
+  # todo: rename this
+  @spec send_data(pid, String.t) :: :ok
+
+  def send_data(pid, data) when is_binary(data) do
     GenServer.cast(pid, {:send, data})
   end
 
@@ -55,19 +61,32 @@ defmodule Diffusion.Connection do
     # Process.flag(:trap_exit, true)
     Logger.info "session opts #{inspect opts}"
 
-    {:ok, opts
-    |> Enum.into(%{})
-    |> Map.merge(State.new())}
+    send self(), :connect
+
+    {:ok, opts}
   end
 
   ##
 
-  def handle_info({'DOWN', mref, :process, _, reason}, %{mref: mref}) do
-    {:stop, {:connection_down, reason}}
+  def handle_info(:connect, %{owner: owner} = state) do
+    case Websocket.open_websocket(state) do
+      {:ok, connection} ->
+        new_state = %{mref: Process.monitor(connection), connection: connection}
+        send owner, :connected
+        {:noreply, Map.merge(state, new_state)}
+      error ->
+        send owner, error
+        {:noreply, state}
+    end
   end
 
-  def handle_info({:gun_down, _, :ws, :closed, _, _}, _state) do
-    {:stop, :websocket_down}
+
+  def handle_info({:DOWN, mref, :process, _, reason}, %{mref: mref} = state) do
+    {:stop, {:connection_down, reason}, state}
+  end
+
+  def handle_info({:gun_down, _, :ws, :closed, _, _}, state) do
+    {:stop, :websocket_down, state}
   end
 
   def handle_info({:gun_ws, _, {:text, data}}, state) do
@@ -76,19 +95,14 @@ defmodule Diffusion.Connection do
     {:noreply, state}
   end
 
+  def handle_info(msg, state) do
+    Logger.warn "Unexpected msg #{inspect msg}"
+    {:noreply, state}
+  end
+
 
   ##
 
-
-  def handle_call({:connect, config}, _, state) do
-    case Websocket.open_websocket(config) do
-      {:ok, connection} ->
-        new_state = %{mref: Process.monitor(connection), connection: connection}
-        {:reply, {:ok, self()}, Map.merge(state, new_state)}
-      error ->
-        {:reply, error, state}
-    end
-  end
 
 
   ##
@@ -103,9 +117,21 @@ defmodule Diffusion.Connection do
     {:noreply, state}
   end
 
-  def terminate(reason, %{connection: connection} = state) do
-    Logger.error "Terminating, reason: #{reason} state #{state}"
-    :ok = Websocket.close(connection)
+
+
+  def terminate(_reason, %{connection: connection} = state) do
+    Logger.info "State when terminating #{inspect state}"
+
+    case Websocket.close(connection) do
+      :ok ->
+        Logger.info "Connection closed"
+      error ->
+        Logger.error "Unable to close connection"
+    end
+    :shutdown
+  end
+
+  def terminate(_, _) do
     :shutdown
   end
 end
