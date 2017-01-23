@@ -54,12 +54,12 @@ defmodule Diffusion.Router do
         # todo: this needs to be more elegant
         case :binary.split(topic_headers, "!") do
           [topic, topic_alias] ->
-            TopicHandler.handle(topic, {:topic_loaded, "!" <> topic_alias})
+            GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic}}}, {:topic_loaded, "!" <> topic_alias})
           _ ->
             Logger.error "error parsing headers [#{inspect topic_headers}]"
         end
       %DataMessage{type: 21, headers: [topic_alias|_tail]} = msg ->
-        TopicHandler.handle(topic_alias, {:topic_delta, msg})
+        GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic_alias}}}, {:topic_delta, msg})
       %DataMessage{} = msg ->
         Logger.debug "data msg #{inspect msg}"
       %ConnectionResponse{} ->

@@ -1,8 +1,10 @@
 require Logger
 
 defmodule Test do
+  alias Diffusion.Websocket.Protocol.DataMessage
+  alias Diffusion.TopicHandler
 
-  alias Diffusion.Websocket.Protocol.DataMessage, as: DataMessage
+  @behaviour TopicHandler
 
   # temp test funs
   def test do
@@ -43,9 +45,15 @@ defmodule Test do
   end
 
 
-  def handle(msg) do
-    Logger.info "DELTA -> #{inspect msg}"
+  # callbacks
+  def topic_init(topic) do
+    Logger.info "Topic init #{topic}"
+    {:ok, %{}}
   end
 
+  def topic_delta(topic, delta, state) do
+    Logger.info "#{topic}: DELTA -> #{inspect delta}"
+    {:ok, state}
+  end
 
 end
