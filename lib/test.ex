@@ -4,7 +4,7 @@ defmodule Test do
   alias Diffusion.Websocket.Protocol.DataMessage
   alias Diffusion.TopicHandler
 
-  @behaviour TopicHandler
+  use TopicHandler
 
   # temp test funs
   def test do

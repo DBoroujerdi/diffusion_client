@@ -17,7 +17,7 @@ defmodule Diffusion.TopicHandlerSup do
 
   def new_handler(topic, owner, callback) do
     args = [topic: topic, owner: owner, callback: callback]
-    worker = worker(TopicHandler, [args], [id: topic, restart: :permanent])
+    worker = worker(callback, [args], [id: topic, restart: :permanent])
 
     Logger.debug "Adding new handler for topic [#{topic}] with callback: #{callback}"
 
