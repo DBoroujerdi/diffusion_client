@@ -1,20 +1,24 @@
 defmodule Diffusion.TopicHandler do
-  alias Diffusion.Router
+  alias Diffusion.{Router, Client}
 
-  # todo: check functions exist on the callback?
 
   use GenServer
 
   @type state :: any
   @type topic :: String.t
+  @type delta :: String.t
 
   @callback topic_init(topic) :: state
-  @callback topic_delta(topic, state) :: {:ok, state}
+  @callback topic_delta(topic, delta, state) :: {:ok, state}
 
   @doc false
   defmacro __using__(_) do
     quote do
       @behaviour unquote(__MODULE__)
+
+      def new(connection, topic, timeout \\ 5000) do
+        Client.add_topic(connection, topic, __MODULE__, timeout)
+      end
 
       def start_link(args) do
         GenServer.start_link(__MODULE__, args |> Enum.into(%{}), [])

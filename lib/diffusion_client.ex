@@ -42,11 +42,11 @@ defmodule Diffusion.Client do
 
   @spec add_topic(Connection.t, binary, module, pos_integer) :: :ok | {:error, any}
 
-  def add_topic(connection, topic, callback, timeout \\ 5000) do
-    Logger.info "Adding topic to #{inspect topic} with callback #{inspect callback}"
+  def add_topic(connection, topic, handler, timeout \\ 5000) do
+    Logger.info "Adding topic to #{inspect topic} with callback #{inspect handler}"
 
     if Process.alive?(connection.via) do
-      case TopicHandlerSup.new_handler(connection, topic, self(), callback) do
+      case TopicHandlerSup.add_handler(connection, topic, self(), handler) do
         {:ok, _} ->
           bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
           Connection.send_data(connection.via, bin)

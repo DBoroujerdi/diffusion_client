@@ -10,13 +10,13 @@ defmodule Diffusion.TopicHandlerSup do
   end
 
 
-  @spec new_handler(Connection.t, String.t, pid, module) :: Supervisor.on_start_child
+  @spec add_handler(Connection.t, String.t, pid, module) :: Supervisor.on_start_child
 
-  def new_handler(connection, topic, owner, callback) do
-    args = [topic: topic, owner: owner, callback: callback]
-    worker = worker(callback, [args], [id: topic, restart: :permanent])
+  def add_handler(connection, topic, owner, handler) do
+    args = [topic: topic, owner: owner, callback: handler]
+    worker = worker(handler, [args], [id: topic, restart: :permanent])
 
-    Logger.debug "Adding new handler for topic [#{topic}] with callback: #{callback}"
+    Logger.debug "Adding new handler for topic [#{topic}] with callback: #{handler}"
 
     Supervisor.start_child(via(connection.host), worker)
   end
