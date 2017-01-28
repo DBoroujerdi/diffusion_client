@@ -16,29 +16,16 @@ defmodule Diffusion.Client do
   in all interactions with the client.
   """
 
-  @spec connect(String.t, number, opts) :: {:ok, Connection.t} | {:error, any} when opts: [atom: any]
+  @spec connect(String.t, number, String.t, opts) :: {:ok, Connection.t} | {:error, any} when opts: [atom: any]
 
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."
 
     case validate_opts(opts) do
       :valid ->
-        # todo: the semantics here are all wrong - should be creating a new session
-        # and receiving the connection pid
-        case Connection.new(host, port, path, timeout, opts) do
-          {:ok, sup} ->
-            receive do
-              {:connected, connection} ->
-                {:ok, connection}
-              error ->
-                Connection.close(sup)
-                error
-            after timeout
-                -> {:error, :timeout}
-            end
-          error -> error
-        end
-      invalid -> invalid
+        Connection.new(host, port, path, timeout, opts)
+      error ->
+        error
     end
   end
 

@@ -33,7 +33,19 @@ defmodule Diffusion.Connection do
     config = opts ++ [host: host, port: port, path: path, timeout: timeout, owner: self()]
     |> Enum.into(%{})
 
-    Diffusion.Supervisor.start_child(config)
+    case Diffusion.Supervisor.start_child(config) do
+      {:ok, pid} ->
+        receive do
+          {:connected, connection} ->
+            {:ok, connection}
+          error ->
+            Diffusion.Supervisor.stop_child(pid)
+            error
+        after timeout
+            -> {:error, :timeout}
+        end
+      error -> error
+    end
   end
 
 
