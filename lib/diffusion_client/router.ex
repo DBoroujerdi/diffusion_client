@@ -1,7 +1,7 @@
 require Logger
 
 defmodule Diffusion.Router do
-  alias Diffusion.{Connection, TopicHandler}
+  alias Diffusion.Connection
   alias Diffusion.Websocket.Protocol
   alias Protocol.{DataMessage, ConnectionResponse}
 
@@ -10,18 +10,17 @@ defmodule Diffusion.Router do
   to the appropriate topic handler.
   """
 
-  use GenServer
-
-  @server __MODULE__
-
-
-  # Client API
-  def start_link do
-    GenServer.start_link(@server, :ok, name: @server)
-  end
 
   def route(bin) when is_binary(bin) do
-    GenServer.cast(@server, {:message, self(), bin})
+    # todo: will this try block actually catch any error?
+    try do
+      Protocol.decode(bin) |> maybe_route()
+    rescue
+      e in RuntimeError ->
+        Logger.error("An error occurred: " <> e.message)
+    end
+
+    :ok
   end
 
   def subscribe(key) do
@@ -34,20 +33,11 @@ defmodule Diffusion.Router do
     {:ok, :ok}
   end
 
-  def handle_cast({:message, connection, message}, _) do
-    try do
-      Protocol.decode(message) |> maybe_route(connection)
-    rescue
-      e in RuntimeError ->
-        Logger.error("An error occurred: " <> e.message)
-    end
-    {:noreply, :ok}
-  end
 
-  defp maybe_route(message, connection) do
+  defp maybe_route(message) do
     case message do
       %DataMessage{type: 25} ->
-        Connection.send_data(connection, Protocol.encode(message))
+        Connection.send_data(self(), Protocol.encode(message))
       %DataMessage{type: 20, headers: [topic_headers]} = msg ->
         Logger.debug "Topic load msg #{inspect msg}"
 

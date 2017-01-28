@@ -1,7 +1,7 @@
 require Logger
 
 defmodule Diffusion.Supervisor do
-  alias Diffusion.{Router, ConnectionSup}
+  alias Diffusion.ConnectionSup
 
   use Supervisor
 
@@ -30,11 +30,7 @@ defmodule Diffusion.Supervisor do
 
 
   def init([]) do
-    children = [
-      worker(Router, [])
-    ]
-
-    supervise(children, strategy: :one_for_one, restart: :permanent)
+    supervise([], strategy: :one_for_one, restart: :permanent)
   end
 
 end

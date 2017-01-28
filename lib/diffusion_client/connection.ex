@@ -55,8 +55,8 @@ defmodule Diffusion.Connection do
     send connection.via, :kill
   end
 
-  # todo: rename this
-  @spec send_data(tuple, String.t) :: :ok
+
+  @spec send_data(identifier, String.t) :: :ok when identifier: tuple | pid
 
   def send_data(via, data) when is_binary(data) do
     GenServer.cast(via, {:send, data})
