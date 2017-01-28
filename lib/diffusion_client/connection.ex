@@ -1,55 +1,52 @@
 require Logger
 
 defmodule Diffusion.Connection do
-  alias Diffusion.{Websocket, Router, ConnectionSup}
+  alias Diffusion.{Websocket, Router}
 
   use GenServer
 
-  @name __MODULE__
+  # todo: the pid in connection should really be a via tuple
+  @type t :: %{via: tuple, host: String.t, path: String.t}
 
   @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
-  defmodule State do
-    @type t :: %State{connection: pid, mref: identifier, owner: pid}
-
-    defstruct connection: nil, mref: nil, owner: nil
-
-    def new do
-      %State{}
-    end
-  end
 
   # API
 
   @spec start_link(opts) :: GenServer.on_start when opts: [{:id, String.t}]
 
-  def start_link(opts) do
+  def start_link(%{host: host} = opts) do
     Logger.info "#{inspect opts}"
-    GenServer.start_link(@name, opts, [])
+    GenServer.start_link(__MODULE__, opts, name: via(host))
   end
 
 
-  @spec new(binary, number, binary, pos_integer, opts) :: Supervisor.on_start_child
+  def via(name) do
+    {:via, :gproc, {:n, :l, {__MODULE__, name}}}
+  end
+
+
+  @spec new(binary, number, binary, pos_integer, opts) :: {:ok, pid} | {:error, any}
         when opts: [{atom, any}]
 
   def new(host, port, path, timeout, opts) do
     config = opts ++ [host: host, port: port, path: path, timeout: timeout, owner: self()]
     |> Enum.into(%{})
 
-    ConnectionSup.start_child(config)
+    Diffusion.Supervisor.start_child(config)
   end
 
 
-  def close(connection) when is_pid(connection) do
+  def close(connection) do
     # todo: is this enough?
-    send connection, :kill
+    send connection.via, :kill
   end
 
   # todo: rename this
-  @spec send_data(pid, String.t) :: :ok
+  @spec send_data(tuple, String.t) :: :ok
 
-  def send_data(pid, data) when is_binary(data) do
-    GenServer.cast(pid, {:send, data})
+  def send_data(via, data) when is_binary(data) do
+    GenServer.cast(via, {:send, data})
   end
 
 
@@ -68,11 +65,11 @@ defmodule Diffusion.Connection do
 
   ##
 
-  def handle_info(:connect, %{owner: owner} = state) do
+  def handle_info(:connect, %{owner: owner, host: host, path: path} = state) do
     case Websocket.open_websocket(state) do
       {:ok, connection} ->
         new_state = %{mref: Process.monitor(connection), connection: connection}
-        send owner, :connected
+        send owner, {:connected, %{via: self(), host: host, path: path}}
         {:noreply, Map.merge(state, new_state)}
       error ->
         send owner, error
@@ -125,7 +122,7 @@ defmodule Diffusion.Connection do
     case Websocket.close(connection) do
       :ok ->
         Logger.info "Connection closed"
-      error ->
+      _error ->
         Logger.error "Unable to close connection"
     end
     :shutdown

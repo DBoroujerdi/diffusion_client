@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.{Connection, ConnectionSup, TopicHandlerSup}
+  alias Diffusion.{Connection, TopicHandlerSup}
   alias Diffusion.Websocket.Protocol
   alias Protocol.DataMessage
 
@@ -16,19 +16,22 @@ defmodule Diffusion.Client do
   in all interactions with the client.
   """
 
-  @spec connect(String.t, number, opts) :: {:ok, pid} | {:error, any} when opts: [atom: any]
+  @spec connect(String.t, number, opts) :: {:ok, Connection.t} | {:error, any} when opts: [atom: any]
 
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."
 
     case validate_opts(opts) do
       :valid ->
+        # todo: the semantics here are all wrong - should be creating a new session
+        # and receiving the connection pid
         case Connection.new(host, port, path, timeout, opts) do
-          {:ok, pid} = connection ->
+          {:ok, sup} ->
             receive do
-              :connected -> connection
+              {:connected, connection} ->
+                {:ok, connection}
               error ->
-                Connection.close(pid)
+                Connection.close(sup)
                 error
             after timeout
                 -> {:error, :timeout}
@@ -50,16 +53,16 @@ defmodule Diffusion.Client do
 
   # todo: can a module callback be typed??
 
-  @spec add_topic(pid, binary, module, pos_integer) :: :ok | {:error, any}
+  @spec add_topic(Connection.t, binary, module, pos_integer) :: :ok | {:error, any}
 
   def add_topic(connection, topic, callback, timeout \\ 5000) do
     Logger.info "Adding topic to #{inspect topic} with callback #{inspect callback}"
 
-    if Process.alive?(connection) do
-      case TopicHandlerSup.new_handler(topic, self(), callback) do
+    if Process.alive?(connection.via) do
+      case TopicHandlerSup.new_handler(connection, topic, self(), callback) do
         {:ok, _} ->
           bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
-          Connection.send_data(connection, bin)
+          Connection.send_data(connection.via, bin)
           receive do
             {:topic_loaded, ^topic} -> :ok
             other -> {:error, {:unexpected_message, other}}
@@ -74,11 +77,11 @@ defmodule Diffusion.Client do
   end
 
 
-  @spec send(pid, DataMessage.t) :: :ok | {:error, :connection_down}
+  @spec send(Connection.t, DataMessage.t) :: :ok | {:error, :connection_down}
 
   def send(connection, data) do
-    if Process.alive?(connection) do
-      Connection.send_data(connection, Protocol.encode(data))
+    if Process.alive?(connection.via) do
+      Connection.send_data(connection.via, Protocol.encode(data))
     else
       {:error, :connection_down}
     end
@@ -90,11 +93,11 @@ defmodule Diffusion.Client do
   will also close as a result.
   """
 
-  @spec close_connection(pid) :: :ok | {:error, any}
+  @spec close_connection(Connection.t) :: :ok | {:error, any}
 
   def close_connection(connection) do
-    if Process.alive?(connection) do
-      ConnectionSup.stop_child(connection)
+    if Process.alive?(connection.via) do
+      Diffusion.Supervisor.stop_child(connection)
     else
       {:error, :no_connection}
     end

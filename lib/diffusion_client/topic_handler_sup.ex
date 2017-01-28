@@ -1,27 +1,29 @@
 require Logger
 
 defmodule Diffusion.TopicHandlerSup do
-  alias Diffusion.TopicHandler
+  alias Diffusion.Connection
 
   use Supervisor
 
-  @module __MODULE__
-  @sup_name __MODULE__
-
-  def start_link do
-    Supervisor.start_link(@module, :ok, name: @sup_name)
+  def start_link(%{host: host}) do
+    Supervisor.start_link(__MODULE__, :ok, name: via(host))
   end
 
 
-  @spec new_handler(String.t, pid, module) :: Supervisor.on_start_child
+  @spec new_handler(Connection.t, String.t, pid, module) :: Supervisor.on_start_child
 
-  def new_handler(topic, owner, callback) do
+  def new_handler(connection, topic, owner, callback) do
     args = [topic: topic, owner: owner, callback: callback]
     worker = worker(callback, [args], [id: topic, restart: :permanent])
 
     Logger.debug "Adding new handler for topic [#{topic}] with callback: #{callback}"
 
-    Supervisor.start_child(@module, worker)
+    Supervisor.start_child(via(connection.host), worker)
+  end
+
+
+  def via(name) do
+    {:via, :gproc, {:n, :l, {__MODULE__, name}}}
   end
 
 
