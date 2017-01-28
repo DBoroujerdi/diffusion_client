@@ -40,11 +40,9 @@ defmodule Diffusion.Router do
         Connection.send_data(self(), Protocol.encode(message))
       %DataMessage{type: 20, headers: [topic_headers]} = msg ->
         Logger.debug "Topic load msg #{inspect msg}"
-
-        # todo: this needs to be more elegant
-        case :binary.split(topic_headers, "!") do
+        case split(topic_headers) do
           [topic, topic_alias] ->
-            GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic}}}, {:topic_loaded, "!" <> topic_alias})
+            GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic}}}, {:topic_loaded, topic_alias})
           _ ->
             Logger.error "error parsing headers [#{inspect topic_headers}]"
         end
@@ -56,6 +54,16 @@ defmodule Diffusion.Router do
         Logger.debug "connection response"
       msg ->
         Logger.error "unexpected msg #{inspect msg}"
+    end
+  end
+
+
+  defp split(string) do
+    case :binary.split(string, "!") do
+      [left, right] ->
+        [left, "!" <> right]
+      _ ->
+        :error
     end
   end
 end
