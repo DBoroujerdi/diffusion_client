@@ -1,12 +1,13 @@
 require Logger
 
 defmodule Diffusion.Connection do
-  alias Diffusion.{Websocket, Router}
+  alias Diffusion.{Websocket, Router, Connection}
 
   use GenServer
 
-  # todo: the pid in connection should really be a via tuple
-  @type t :: %{via: tuple, host: String.t, path: String.t}
+  @type t :: %Connection{via: tuple, host: String.t, path: String.t}
+
+  defstruct via: nil, host: nil, host: nil, path: nil
 
   @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
@@ -81,7 +82,7 @@ defmodule Diffusion.Connection do
     case Websocket.open_websocket(state) do
       {:ok, connection} ->
         new_state = %{mref: Process.monitor(connection), connection: connection}
-        send owner, {:connected, %{via: self(), host: host, path: path}}
+        send owner, {:connected, %Connection{via: self(), host: host, path: path}}
         {:noreply, Map.merge(state, new_state)}
       error ->
         send owner, error
