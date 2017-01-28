@@ -5,6 +5,7 @@ defmodule Diffusion.Router do
   alias Diffusion.Websocket.Protocol
   alias Protocol.{DataMessage, ConnectionResponse}
 
+
   @moduledoc """
   Decodes and routes diffusion messages recieved from the connection
   to the appropriate topic handler.
@@ -28,11 +29,8 @@ defmodule Diffusion.Router do
     :gproc.reg({:p, :l, {:topic_event, key}})
   end
 
-  # Server callbacks
-  def init(:ok) do
-    {:ok, :ok}
-  end
 
+  ##
 
   defp maybe_route(message) do
     case message do
