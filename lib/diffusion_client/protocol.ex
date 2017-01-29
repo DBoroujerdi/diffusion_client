@@ -4,9 +4,7 @@ defmodule Diffusion.Websocket.Protocol do
     @type t :: connection_response
 
     @type connection_type     :: 100 | 105
-    @type connection_response :: %ConnectionResponse{ type: connection_type,
-                                                      client_id: String.t,
-                                                      version: number}
+    @type connection_response :: %ConnectionResponse{type: connection_type, client_id: String.t, version: number}
 
     defstruct [:type, :client_id, :version]
   end
@@ -17,18 +15,14 @@ defmodule Diffusion.Websocket.Protocol do
     @type data         :: binary
     @type header       :: binary
     @type message_type :: 20..48
-    @type data_message ::  %DataMessage{ type: message_type,
-                                         headers: [header],
-                                         data: data}
+    @type data_message ::  %DataMessage{type: message_type, headers: [header], data: data}
 
     defstruct [:type, headers: [], data: <<>>]
   end
 
 
   @type connection_type     :: 100 | 105
-  @type connection_response :: %ConnectionResponse{ type: connection_type,
-                                                    client_id: String.t,
-                                                    version: number}
+  @type connection_response :: %ConnectionResponse{type: connection_type, client_id: String.t, version: number}
 
   @type reason :: any()
 
@@ -37,13 +31,27 @@ defmodule Diffusion.Websocket.Protocol do
   Where T is the message-type byte, H is optional header bytes seperated
   by field delimiters FD and D is the data bytes also seperated by field
   delimiters.
+
+  ## Example
+
+      %DataMessage{type: 21, headers: ["!je"], data: "1.6752"} = Protocol.decode("\u{15}!je\u{01}1.6752")
+
   """
 
   @spec decode(binary) :: DataMessage.t | ConnectionResponse.t | {:error, reason}
+  def decode(bin) do
+    try do
+      do_decode(bin)
+    catch
+      _, value ->
+        {:error, value}
+    end
+  end
 
-  def decode(<<>>), do: {:error, :empty_binary}
 
-  def decode(<<type::integer, rest::binary>>) when type >= 20 and type <= 48 do
+  defp do_decode(<<>>), do: {:error, :empty_binary}
+
+  defp do_decode(<<type::integer, rest::binary>>) when type >= 20 and type <= 48 do
     case :binary.split(rest, "\u{01}") do
       [data] ->
         %DataMessage{type: type, data: split(data), headers: []}
@@ -54,7 +62,7 @@ defmodule Diffusion.Websocket.Protocol do
     end
   end
 
-  def decode(bin) when is_binary(bin) do
+  defp do_decode(bin) when is_binary(bin) do
     <<
       version_bin  :: bytes-size(1), "\u{02}",
       type_bin     :: bytes-size(3), "\u{02}",
@@ -75,22 +83,31 @@ defmodule Diffusion.Websocket.Protocol do
   Where T is the message-type byte, H is optional header bytes seperated
   by field delimiters FD and D is the data bytes also seperated by field
   delimiters.
+
+  ## Example
+      "\u{19}1484349590272\u{01}" = Protocol.encode(%DataMessage{type: 25, headers: ["1484349590272"], data: ""})
+
   """
 
   @spec encode(DataMessage.t) :: String.t
+  def encode(data) do
+    try do
+      do_encode(data)
+    catch
+      _, value ->
+        {:error, value}
+    end
+  end
 
-  def encode(%ConnectionResponse{type: type, client_id: id, version: version}) do
+
+  defp do_encode(%ConnectionResponse{type: type, client_id: id, version: version}) do
     Integer.to_string(version) <> "\u{02}" <> Integer.to_string(type) <> "\u{02}" <> id
   end
 
-  def encode(%DataMessage{type: type, data: data, headers: headers}) do
+  defp do_encode(%DataMessage{type: type, data: data, headers: headers}) do
     type_of(type) <> Enum.join(headers, "\u{02}") <> "\u{01}" <> data
   end
 
-
-  ##
-  ## Private
-  ##
 
   defp type_of(type) do
     case type do

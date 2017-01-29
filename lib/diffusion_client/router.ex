@@ -11,18 +11,11 @@ defmodule Diffusion.Router do
   to the appropriate topic handler.
   """
 
+  # toodo: should protocol decoding and routing be decoupled here?
 
-  def route(bin) when is_binary(bin) do
-    # todo: will this try block actually catch any error?
-    try do
-      Protocol.decode(bin) |> maybe_route()
-    rescue
-      e in RuntimeError ->
-        Logger.error("An error occurred: " <> e.message)
-    end
+  # todo: are topic aliases removed for topics we are no longer listening to?
 
-    :ok
-  end
+  # todo: this should be functional. route should convert a decode value into a spec to be routed to
 
   def subscribe(key) do
     Logger.debug "#{inspect self()}: subscribing for events #{inspect key}"
@@ -32,12 +25,14 @@ defmodule Diffusion.Router do
 
   ##
 
-  defp maybe_route(message) do
-    case message do
+  def route(bin) do
+    case Protocol.decode(bin) do
       %DataMessage{type: 25} ->
-        Connection.send_data(self(), Protocol.encode(message))
+        Connection.send_data(self(), Protocol.encode(bin))
       %DataMessage{type: 20, headers: [topic_headers]} = msg ->
         Logger.debug "Topic load msg #{inspect msg}"
+
+        # todo: splitting the headers appart should really be a concern of the Protocol
         case split(topic_headers) do
           [topic, topic_alias] ->
             GenServer.cast({:via, :gproc, {:p, :l, {:topic_event, topic}}}, {:topic_loaded, topic_alias})
