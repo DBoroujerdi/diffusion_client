@@ -45,7 +45,7 @@ end
 
 iex> {:ok, connection} = Diffusion.Client.connect("demo.pushtechnology.com", 80, "/diffusion?t=Commands&v=4&ty=WB", 5000, [])
 iex> msg = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: "pass\u{02}password"}
-iex> :ok = Diffusion.Client.send(session, msg)
+iex> :ok = Diffusion.Client.send(connection, msg)
 iex> :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/B")
 iex> :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/O")
 
