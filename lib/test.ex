@@ -4,7 +4,6 @@ defmodule Test do
   alias Diffusion.Websocket.Protocol.DataMessage
   alias Diffusion.TopicHandler
 
-  use TopicHandler
 
   # temp test funs
   def test do
@@ -13,9 +12,9 @@ defmodule Test do
     msg = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: "pass\u{02}password"}
     :ok = Diffusion.Client.send(session, msg)
 
-    Diffusion.Client.add_topic(session, "Assets/FX/EURUSD/B", __MODULE__)
-    Diffusion.Client.add_topic(session, "Assets/FX/EURUSD/O", __MODULE__)
-    Diffusion.Client.add_topic(session, "Assets/FX/GBPUSD/B", __MODULE__)
+    ExampleTopicHandler.new(session, "Assets/FX/EURUSD/B")
+    ExampleTopicHandler.new(session, "Assets/FX/EURUSD/O")
+    ExampleTopicHandler.new(session, "Assets/FX/GBPUSD/B")
 
   end
 
@@ -38,14 +37,22 @@ defmodule Test do
 
     {:ok, session} = Diffusion.Client.connect("scoreboards.williamhill.com", 80, "/diffusion?t=sportsbook%2Ffootball%2Fstatus&v=4&ty=WB", 5000, [headers: headers])
 
-    Diffusion.Client.add_topic(session, "sportsbook/football/10524850/i18n/en-gb/commentary", __MODULE__)
-    Diffusion.Client.add_topic(session, "sportsbook/football/10524850/stats/time", __MODULE__)
+    ExampleTopicHandler.new(session, "sportsbook/football/10476395/i18n/en-gb/commentary")
+    # ExampleTopicHandler.new(session, "sportsbook/football/10476395/stats/time")
 
     session
   end
 
+end
 
-  # callbacks
+
+
+defmodule ExampleTopicHandler do
+  alias Diffusion.TopicHandler
+
+  use TopicHandler
+
+    # callbacks
   def topic_init(topic) do
     Logger.info "Topic init #{topic}"
     {:ok, %{}}
@@ -55,5 +62,4 @@ defmodule Test do
     Logger.info "#{topic}: DELTA -> #{inspect delta}"
     {:ok, state}
   end
-
 end
