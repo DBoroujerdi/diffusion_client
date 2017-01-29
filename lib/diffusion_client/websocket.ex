@@ -9,7 +9,7 @@ defmodule Diffusion.Websocket do
   @spec send(pid, binary) :: :ok
 
   def send(connection, data) do
-    Logger.info "Sending #{data}"
+    Logger.debug "Sending #{data}"
     :gun.ws_send(connection, {:binary, data})
   end
 

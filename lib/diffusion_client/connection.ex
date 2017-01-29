@@ -1,7 +1,9 @@
 require Logger
 
 defmodule Diffusion.Connection do
-  alias Diffusion.{Websocket, Router, Connection}
+  alias Diffusion.{Connection, TopicHandler, Websocket}
+  alias Diffusion.Websocket.Protocol
+  alias Protocol.DataMessage
 
   use GenServer
 
@@ -69,7 +71,7 @@ defmodule Diffusion.Connection do
 
   def init(opts) do
     # Process.flag(:trap_exit, true)
-    Logger.info "session opts #{inspect opts}"
+    Logger.debug "session opts #{inspect opts}"
 
     send self(), :connect
 
@@ -100,8 +102,15 @@ defmodule Diffusion.Connection do
   end
 
   def handle_info({:gun_ws, _, {:text, data}}, state) do
-    Logger.debug "Received -> #{data}"
-    :ok = Router.route(data)
+    case Protocol.decode(data) do
+      {:error, reason} ->
+        Logger.error "error decoding #{inspect reason}"
+      %DataMessage{type: 25} ->
+        Websocket.send(state.connection, data)
+      decoded ->
+        TopicHandler.handle(decoded)
+    end
+
     {:noreply, state}
   end
 

@@ -1,5 +1,9 @@
 defmodule Diffusion.Websocket.Protocol do
 
+  # todo: headers on the decoded result should work like headers.topic, headers.alias
+  # - would require a per type parsing of the binary which would make this module a lot more complicated.
+  # currently, calling client have to know about the index of a particular header which isn't ideal.
+
   defmodule ConnectionResponse do
     @type t :: connection_response
 
@@ -25,6 +29,7 @@ defmodule Diffusion.Websocket.Protocol do
   @type connection_response :: %ConnectionResponse{type: connection_type, client_id: String.t, version: number}
 
   @type reason :: any()
+
 
   @doc """
   Decode a message binary in the form - TH...D...
@@ -85,6 +90,7 @@ defmodule Diffusion.Websocket.Protocol do
   delimiters.
 
   ## Example
+
       "\u{19}1484349590272\u{01}" = Protocol.encode(%DataMessage{type: 25, headers: ["1484349590272"], data: ""})
 
   """

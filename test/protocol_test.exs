@@ -47,7 +47,7 @@ defmodule Diffusion.Websocket.ProtocolTest do
       end
 
       it "should throw error for non binary" do
-        catch_error Protocol.decode(42)
+        assert Protocol.decode(42) == {:error, :function_clause}
       end
     end
   end

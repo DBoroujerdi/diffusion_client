@@ -18,6 +18,7 @@ defmodule Test do
 
   end
 
+  # todo: remove this example - should be moved to a william hill specific app
   def test2() do
     headers = [
       {"Pragma", "no-cache"},
@@ -58,6 +59,7 @@ defmodule ExampleTopicHandler do
     {:ok, %{}}
   end
 
+  # todo: should print out pid here to explicitly show in the example that these are processed concurrently
   def topic_delta(topic, delta, state) do
     Logger.info "#{topic}: DELTA -> #{inspect delta}"
     {:ok, state}
