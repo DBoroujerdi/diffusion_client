@@ -8,7 +8,7 @@ defmodule Diffusion.Websocket.Protocol do
                                                       client_id: String.t,
                                                       version: number}
 
-    defstruct type: nil, client_id: nil, version: nil
+    defstruct [:type, :client_id, :version]
   end
 
   defmodule DataMessage do
@@ -21,7 +21,7 @@ defmodule Diffusion.Websocket.Protocol do
                                          headers: [header],
                                          data: data}
 
-    defstruct type: nil, headers: [], data: <<>>
+    defstruct [:type, headers: [], data: <<>>]
   end
 
 

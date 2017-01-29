@@ -7,7 +7,7 @@ defmodule Diffusion.Connection do
 
   @type t :: %Connection{via: tuple, host: String.t, path: String.t}
 
-  defstruct via: nil, host: nil, host: nil, path: nil
+  defstruct [:via, :host, :host, :path]
 
   @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
