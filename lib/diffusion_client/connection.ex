@@ -65,6 +65,19 @@ defmodule Diffusion.Connection do
   end
 
 
+  @spec send_data_sync(identifier, String.t, matcher, number) :: :ok when identifier: tuple | pid, matcher: term
+
+  def send_data_sync(via, data, matcher, timeout \\ 5000) do
+    GenServer.cast(via, {:send, data})
+
+    receive do
+      ^matcher -> :ok
+      other -> {:error, {:unexpected_message, other}}
+    after timeout
+        -> {:error, :timeout}
+    end
+  end
+
   # callbacks
 
   ##
@@ -102,6 +115,8 @@ defmodule Diffusion.Connection do
   end
 
   def handle_info({:gun_ws, _, {:text, data}}, state) do
+    Logger.debug data
+
     case Protocol.decode(data) do
       {:error, reason} ->
         Logger.error "error decoding #{inspect reason}"

@@ -1,5 +1,7 @@
 defmodule Diffusion.Websocket.Protocol do
 
+  # http://docs.pushtechnology.com/docs/5.1.18/manual/com.pushtechnology.diffusion.manual_5.1.18/protocol/r_messages-protocol.html
+
   # todo: headers on the decoded result should work like headers.topic, headers.alias
   # - would require a per type parsing of the binary which would make this module a lot more complicated.
   # currently, calling client have to know about the index of a particular header which isn't ideal.

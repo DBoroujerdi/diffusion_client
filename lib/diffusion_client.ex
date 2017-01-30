@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.{Connection, TopicHandlerSup}
+  alias Diffusion.Connection
   alias Diffusion.Websocket.Protocol
   alias Protocol.DataMessage
 
@@ -29,39 +29,6 @@ defmodule Diffusion.Client do
     end
   end
 
-
-  @doc """
-  Subscribe to topic delta stream.
-
-  todo: command should be a proper data type here.
-  todo: should return an erro case if subscription was not possible for some
-  reason. maybe the topic doesn't exist
-  """
-
-  # todo: can a module callback be typed??
-
-  @spec add_topic(Connection.t, binary, module, pos_integer) :: :ok | {:error, any}
-
-  def add_topic(connection, topic, handler, timeout \\ 5000) do
-    Logger.info "Adding topic to #{inspect topic} with callback #{inspect handler}"
-
-    if Process.alive?(connection.via) do
-      case TopicHandlerSup.add_handler(connection, topic, self(), handler) do
-        {:ok, _} ->
-          bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
-          Connection.send_data(connection.via, bin)
-          receive do
-            {:topic_loaded, ^topic} -> :ok
-            other -> {:error, {:unexpected_message, other}}
-          after timeout
-              -> {:error, :timeout}
-          end
-        error -> error
-      end
-    else
-      {:error, :connection_down}
-    end
-  end
 
 
   @spec send(Connection.t, DataMessage.t) :: :ok | {:error, :connection_down}
