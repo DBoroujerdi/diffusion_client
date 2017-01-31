@@ -18,8 +18,8 @@ defmodule Diffusion.TopicHandler do
 
   def handle(message) do
     case to_event(message) do
-      {:no_handler, error} ->
-        Logger.error "no handler for #{inspect error}"
+      :nil ->
+        Logger.error "unable to convert to event: #{inspect message}"
       event ->
         Logger.debug "#{inspect event} -> #{inspect message}"
         :gproc_ps.publish(:l, event, message)
@@ -118,7 +118,7 @@ defmodule Diffusion.TopicHandler do
       %Delta{topic_alias: topic_alias} ->
         {:topic_message, topic_alias}
       _ ->
-        {:error, message}
+        :nil
     end
   end
 end
