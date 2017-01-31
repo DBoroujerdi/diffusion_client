@@ -77,9 +77,16 @@ defmodule Diffusion.TopicHandler do
 
         send self(), :init
 
+        Process.monitor(:gproc.lookup_pid(connection.via))
+
         {:ok, %{connection: connection, topic: topic, owner: owner, callback_state: %{}}}
       end
 
+
+      def handle_info({:DOWN, _, :process, _, _}, state) do
+        Logger.error "Connection is down! restarting handler"
+        exit(:connection_down)
+      end
 
       def handle_info(:init, state) do
         Logger.debug "initializing topic handler.."

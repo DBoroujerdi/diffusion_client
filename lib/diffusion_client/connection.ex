@@ -9,6 +9,7 @@ defmodule Diffusion.Connection do
 
   @type t :: %Connection{via: tuple, host: String.t, path: String.t}
 
+  # todo: consider renaming 'via' to 'aka'
   defstruct [:via, :host, :host, :path]
 
   @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
@@ -25,7 +26,11 @@ defmodule Diffusion.Connection do
 
 
   def via(name) do
-    {:via, :gproc, {:n, :l, {__MODULE__, name}}}
+    {:via, :gproc, key(name)}
+  end
+
+  def key(name) do
+    {:n, :l, {__MODULE__, name}}
   end
 
 
@@ -60,8 +65,8 @@ defmodule Diffusion.Connection do
 
   @spec send_data(identifier, String.t) :: :ok when identifier: tuple | pid
 
-  def send_data(via, data) when is_binary(data) do
-    GenServer.cast(via, {:send, data})
+  def send_data({:n, :l, _} = key, data) when is_binary(data) do
+    GenServer.cast({:via, :gproc, key}, {:send, data})
   end
 
 
@@ -97,7 +102,7 @@ defmodule Diffusion.Connection do
     case Websocket.open_websocket(state) do
       {:ok, connection} ->
         new_state = %{mref: Process.monitor(connection), connection: connection}
-        send owner, {:connected, %Connection{via: self(), host: host, path: path}}
+        send owner, {:connected, %Connection{via: key(host), host: host, path: path}}
         {:noreply, Map.merge(state, new_state)}
       error ->
         send owner, error
@@ -107,11 +112,11 @@ defmodule Diffusion.Connection do
 
 
   def handle_info({:DOWN, mref, :process, _, reason}, %{mref: mref} = state) do
-    {:stop, {:connection_down, reason}, state}
+    exit({:connection_process_down, reason})
   end
 
   def handle_info({:gun_down, _, :ws, :closed, _, _}, state) do
-    {:stop, :websocket_down, state}
+    exit({:connection_process_down, "monitor down"})
   end
 
   def handle_info({:gun_ws, _, {:text, data}}, state) do
@@ -129,15 +134,6 @@ defmodule Diffusion.Connection do
     {:noreply, state}
   end
 
-  def handle_info(msg, state) do
-    Logger.warn "Unexpected msg #{inspect msg}"
-    {:noreply, state}
-  end
-
-
-  ##
-
-
 
   ##
 
@@ -146,19 +142,13 @@ defmodule Diffusion.Connection do
     {:noreply, state}
   end
 
-  def handle_cast(msg, state) do
-    Logger.info "Unexpected msg #{msg}"
-    {:noreply, state}
-  end
-
-
 
   def terminate(_reason, %{connection: connection} = state) do
     Logger.info "State when terminating #{inspect state}"
 
     case Websocket.close(connection) do
       :ok ->
-        Logger.info "Connection closed"
+        Logger.debug "Connection closed"
       _error ->
         Logger.error "Unable to close connection"
     end
