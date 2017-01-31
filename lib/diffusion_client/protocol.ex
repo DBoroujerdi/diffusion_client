@@ -2,9 +2,8 @@ defmodule Diffusion.Websocket.Protocol do
 
   # http://docs.pushtechnology.com/docs/5.1.18/manual/com.pushtechnology.diffusion.manual_5.1.18/protocol/r_messages-protocol.html
 
-  # todo: headers on the decoded result should work like headers.topic, headers.alias
-  # - would require a per type parsing of the binary which would make this module a lot more complicated.
-  # currently, calling client have to know about the index of a particular header which isn't ideal.
+
+  @type message :: ConnectionResponse.t | Delta.t | TopicLoad.t | Ping.t | map
 
   defmodule ConnectionResponse do
     @type t :: connection_response
@@ -15,16 +14,42 @@ defmodule Diffusion.Websocket.Protocol do
     defstruct [:type, :client_id, :version]
   end
 
-  defmodule DataMessage do
+  defmodule Delta do
+    @type t :: delta
+
+    @type delta :: %Delta{type: 21, data: String.t, topic_alias: String.t}
+
+    defstruct [:type, :data, :topic_alias]
+  end
+
+  defmodule TopicLoad do
+    @type t :: topic_load
+
+    @type topic_load :: %TopicLoad{type: 20, topic: String.t, topic_alias: String.t}
+
+    defstruct [:type, :data, :topic, :topic_alias]
+  end
+
+  defmodule Ping do
+    @type t :: ping
+
+    @type ping :: %Ping{type: 25, timestamp: String.t}
+
+    defstruct [:type, :timestamp]
+  end
+
+  defmodule Message do
     @type t :: data_message
 
     @type data         :: binary
     @type header       :: binary
     @type message_type :: 20..48
-    @type data_message ::  %DataMessage{type: message_type, headers: [header], data: data}
+    @type data_message ::  %Message{type: message_type, headers: [header], data: data}
 
     defstruct [:type, headers: [], data: <<>>]
   end
+
+
 
 
   @type connection_type     :: 100 | 105
@@ -39,13 +64,14 @@ defmodule Diffusion.Websocket.Protocol do
   by field delimiters FD and D is the data bytes also seperated by field
   delimiters.
 
-  ## Example
+  ## Examples
 
-      %DataMessage{type: 21, headers: ["!je"], data: "1.6752"} = Protocol.decode("\u{15}!je\u{01}1.6752")
+      %Delta{type: 21, topic_alias: "!je", data: "1.6752"} = Protocol.decode("\u{15}!je\u{01}1.6752")
+      %Ping{type: 25, timestamp: "1484349590272"} = Protocol.decode("\u{19}1484349590272\u{01}")
 
   """
 
-  @spec decode(binary) :: DataMessage.t | ConnectionResponse.t | {:error, reason}
+  @spec decode(binary) :: message | {:error, reason}
   def decode(bin) do
     try do
       do_decode(bin)
@@ -59,14 +85,7 @@ defmodule Diffusion.Websocket.Protocol do
   defp do_decode(<<>>), do: {:error, :empty_binary}
 
   defp do_decode(<<type::integer, rest::binary>>) when type >= 20 and type <= 48 do
-    case :binary.split(rest, "\u{01}") do
-      [data] ->
-        %DataMessage{type: type, data: split(data), headers: []}
-      [headers, data] ->
-        %DataMessage{type: type, data: data, headers: split(headers)}
-      _ ->
-        {:error, :decode_failure}
-    end
+    decode_message(type, :binary.split(rest, "\u{01}"))
   end
 
   defp do_decode(bin) when is_binary(bin) do
@@ -85,6 +104,31 @@ defmodule Diffusion.Websocket.Protocol do
   end
 
 
+  defp decode_message(20 = type, [headers, data]) do
+    case :binary.split(headers, "!") do
+      [left, right] ->
+        %TopicLoad{type: type, data: data, topic: left, topic_alias: "!" <> right}
+    end
+  end
+
+  defp decode_message(21 = type, [topic_alias, data]) do
+    %Delta{type: type, data: data, topic_alias: topic_alias}
+  end
+
+  defp decode_message(25 = type, [data, _]) do
+    %Ping{type: type, timestamp: data}
+  end
+
+  defp decode_message(type, [data]) do
+    %Message{type: type, data: split(data), headers: []}
+  end
+
+  defp decode_message(type, [headers, data]) do
+    %Message{type: type, data: data, headers: split(headers)}
+  end
+
+
+
   @doc """
   Encode a diffusion message as a binary of the form TH...D...
   Where T is the message-type byte, H is optional header bytes seperated
@@ -93,11 +137,11 @@ defmodule Diffusion.Websocket.Protocol do
 
   ## Example
 
-      "\u{19}1484349590272\u{01}" = Protocol.encode(%DataMessage{type: 25, headers: ["1484349590272"], data: ""})
+      "\u{19}1484349590272\u{01}" = Protocol.encode(%Ping{type: 25, timestamp: "1484349590272"})
 
   """
 
-  @spec encode(DataMessage.t) :: String.t
+  @spec encode(message) :: String.t
   def encode(data) do
     try do
       do_encode(data)
@@ -112,7 +156,11 @@ defmodule Diffusion.Websocket.Protocol do
     Integer.to_string(version) <> "\u{02}" <> Integer.to_string(type) <> "\u{02}" <> id
   end
 
-  defp do_encode(%DataMessage{type: type, data: data, headers: headers}) do
+  defp do_encode(%Ping{type: type, timestamp: timestamp}) do
+    type_of(type) <> timestamp <> "\u{01}"
+  end
+
+  defp do_encode(%{type: type, data: data, headers: headers}) do
     type_of(type) <> Enum.join(headers, "\u{02}") <> "\u{01}" <> data
   end
 

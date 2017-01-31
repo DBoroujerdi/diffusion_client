@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Connection do
   alias Diffusion.{Connection, TopicHandler, Websocket}
   alias Diffusion.Websocket.Protocol
-  alias Protocol.DataMessage
+  alias Protocol.Ping
 
   use GenServer
 
@@ -120,7 +120,7 @@ defmodule Diffusion.Connection do
     case Protocol.decode(data) do
       {:error, reason} ->
         Logger.error "error decoding #{inspect reason}"
-      %DataMessage{type: 25} ->
+      %Ping{} ->
         Websocket.send(state.connection, data)
       decoded ->
         TopicHandler.handle(decoded)

@@ -1,9 +1,9 @@
 require Logger
 
 defmodule Diffusion.TopicHandler do
-  alias Diffusion.{Util, TopicHandlerSup, Connection}
+  alias Diffusion.{TopicHandlerSup, Connection}
   alias Diffusion.Websocket.Protocol
-  alias Protocol.DataMessage
+  alias Protocol.{Delta, TopicLoad, Message}
 
 
   use GenServer
@@ -49,7 +49,7 @@ defmodule Diffusion.TopicHandler do
 
         case Supervisor.start_child(TopicHandlerSup.via(connection.host), worker) do
           {:ok, child} ->
-            bin = Protocol.encode(%DataMessage{type: 22, headers: [topic]})
+            bin = Protocol.encode(%Message{type: 22, headers: [topic]})
             case Connection.send_data_sync(connection.via, bin, {:topic_loaded, topic}) do
               {:error, reason} ->
                 Supervisor.terminate_child(TopicHandlerSup.via(connection.host), child)
@@ -94,19 +94,12 @@ defmodule Diffusion.TopicHandler do
 
       defp handle_message(message, state) do
         Logger.debug "message #{inspect message}"
-
         case message do
-          %DataMessage{type: 20, headers: [topic_headers]} ->
-            # todo: duplicate code: see below
-            case Util.split(topic_headers) do
-              [topic, topic_alias] ->
-                :gproc_ps.subscribe(:l, {:topic_message, topic_alias})
-              _ ->
-                :ok
-            end
-            send state.owner, {:topic_loaded, state.topic}
-            __MODULE__.topic_init(state.topic)
-          %DataMessage{type: 21} ->
+          %TopicLoad{topic: topic, topic_alias: topic_alias} ->
+            :gproc_ps.subscribe(:l, {:topic_message, topic_alias})
+            send state.owner, {:topic_loaded, topic}
+            __MODULE__.topic_init(topic)
+          %Delta{} ->
             __MODULE__.topic_delta(state.topic, message, state.callback_state)
           _ ->
             :unhandled
@@ -120,16 +113,9 @@ defmodule Diffusion.TopicHandler do
 
   defp to_event(message) do
     case message do
-      %DataMessage{type: 20, headers: [topic_headers]} ->
-        # todo: splitting the headers appart should really be a concern of the Protocol
-        # would prefer if i could do something like headers.alias and headers.topic
-        case Util.split(topic_headers) do
-          [topic, _] ->
-            {:topic_message, topic}
-          _ ->
-            {:error, message}
-        end
-      %DataMessage{type: 21, headers: [topic_alias|_]} ->
+      %TopicLoad{topic: topic} ->
+        {:topic_message, topic}
+      %Delta{topic_alias: topic_alias} ->
         {:topic_message, topic_alias}
       _ ->
         {:error, message}
