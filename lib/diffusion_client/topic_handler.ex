@@ -47,12 +47,12 @@ defmodule Diffusion.TopicHandler do
         owner = self()
         worker = Supervisor.Spec.worker(__MODULE__, [[topic: topic, connection: connection, owner: owner]], [id: topic, restart: :permanent])
 
-        case Supervisor.start_child(TopicHandlerSup.via(connection.host), worker) do
+        case TopicHandlerSup.start_child(connection, worker) do
           {:ok, child} ->
             bin = Protocol.encode(%Message{type: 22, headers: [topic]})
             case Connection.send_data_sync(connection.via, bin, {:topic_loaded, topic}) do
               {:error, reason} ->
-                Supervisor.terminate_child(TopicHandlerSup.via(connection.host), child)
+                TopicHandlerSup.stop_child(connection, child)
               ok -> ok
             end
           error -> error
