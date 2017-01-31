@@ -49,11 +49,12 @@ defmodule Diffusion.TopicHandler do
 
         case TopicHandlerSup.start_child(connection, worker) do
           {:ok, child} ->
-            bin = Protocol.encode(%Message{type: 22, headers: [topic]})
-            case Connection.send_data_sync(connection.via, bin, {:topic_loaded, topic}) do
-              {:error, reason} ->
-                TopicHandlerSup.stop_child(connection, child)
-              ok -> ok
+            receive do
+              {:topic_loaded, ^topic} -> :ok
+              other -> {:error, {:unexpected_message, other}}
+            after timeout
+                -> TopicHandlerSup.stop_child(connection, child)
+              {:error, :timeout}
             end
           error -> error
         end
@@ -69,13 +70,23 @@ defmodule Diffusion.TopicHandler do
       def init(args) do
         owner = Keyword.get(args, :owner)
         topic = Keyword.get(args, :topic)
-        # todo: take out connetion and pass that in. we'll use that to link to the connection
+        connection = Keyword.get(args, :connection)
 
         Logger.debug "initing handler for topic #{inspect topic}"
         :gproc_ps.subscribe(:l, {:topic_message, topic})
-        {:ok, %{topic: topic, owner: owner, callback_state: %{}}}
+
+        send self(), :init
+
+        {:ok, %{connection: connection, topic: topic, owner: owner, callback_state: %{}}}
       end
 
+
+      def handle_info(:init, state) do
+        Logger.debug "initializing topic handler.."
+        bin = Protocol.encode(%Message{type: 22, headers: [state.topic]})
+        :ok = Connection.send_data(state.connection.via, bin)
+        {:noreply, state}
+      end
 
       def handle_info({:gproc_ps_event, {:topic_message, _}, message}, state) do
         Logger.debug "handling #{inspect message}"
