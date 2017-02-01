@@ -14,7 +14,11 @@ defmodule Diffusion.ConnectionSup do
 
 
   def via(name) do
-    {:via, :gproc, {:n, :l, {__MODULE__, name}}}
+    {:via, :gproc, key(name)}
+  end
+
+  def key(name) do
+    {:n, :l, {__MODULE__, name}}
   end
 
 
@@ -28,5 +32,4 @@ defmodule Diffusion.ConnectionSup do
 
     supervise(children, strategy: :one_for_one, restart: :permanent)
   end
-
 end

@@ -64,8 +64,6 @@ defmodule Diffusion.TopicHandler do
         GenServer.start_link(__MODULE__, args, [])
       end
 
-      # todo: a topic handler should be able to resubscribe via the connection if the connection has restarted and
-      # the subscriptions have not been preserved on reconnection
 
       def init(args) do
         owner = Keyword.get(args, :owner)
@@ -77,7 +75,7 @@ defmodule Diffusion.TopicHandler do
 
         send self(), :init
 
-        Process.monitor(:gproc.lookup_pid(connection.via))
+        Process.monitor(:gproc.lookup_pid(connection.aka))
 
         {:ok, %{connection: connection, topic: topic, owner: owner, callback_state: %{}}}
       end
@@ -91,7 +89,7 @@ defmodule Diffusion.TopicHandler do
       def handle_info(:init, state) do
         Logger.debug "initializing topic handler.."
         bin = Protocol.encode(%Message{type: 22, headers: [state.topic]})
-        :ok = Connection.send_data(state.connection.via, bin)
+        :ok = Connection.send_data(state.connection.aka, bin)
         {:noreply, state}
       end
 

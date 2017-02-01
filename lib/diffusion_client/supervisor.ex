@@ -23,11 +23,13 @@ defmodule Diffusion.Supervisor do
     Supervisor.start_child(__MODULE__, child)
   end
 
-
-  def stop_child(pid) do
-    Supervisor.terminate_child(__MODULE__, pid)
+  def stop_child(connection) do
+    if Supervisor.terminate_child(__MODULE__, connection.host) == :ok do
+      Supervisor.delete_child(__MODULE__, connection.host)
+    else
+      {:error, :no_child}
+    end
   end
-
 
   def init([]) do
     supervise([], strategy: :one_for_one, restart: :permanent)

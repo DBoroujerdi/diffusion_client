@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.Connection
+  alias Diffusion.{Connection, ConnectionSup}
   alias Diffusion.Websocket.Protocol
   alias Protocol.DataMessage
 
@@ -34,11 +34,7 @@ defmodule Diffusion.Client do
   @spec send(Connection.t, DataMessage.t) :: :ok | {:error, :connection_down}
 
   def send(connection, data) do
-    if Process.alive?(connection.via) do
-      Connection.send_data(connection.via, Protocol.encode(data))
-    else
-      {:error, :connection_down}
-    end
+    Connection.send_data(connection.aka, Protocol.encode(data))
   end
 
 
@@ -50,11 +46,7 @@ defmodule Diffusion.Client do
   @spec close_connection(Connection.t) :: :ok | {:error, any}
 
   def close_connection(connection) do
-    if Process.alive?(connection.via) do
-      Diffusion.Supervisor.stop_child(connection)
-    else
-      {:error, :no_connection}
-    end
+    Diffusion.Supervisor.stop_child(connection)
   end
 
 

@@ -7,10 +7,9 @@ defmodule Diffusion.Connection do
 
   use GenServer
 
-  @type t :: %Connection{via: tuple, host: String.t, path: String.t}
+  @type t :: %Connection{aka: tuple, host: String.t, path: String.t}
 
-  # todo: consider renaming 'via' to 'aka'
-  defstruct [:via, :host, :host, :path]
+  defstruct [:aka, :host, :host, :path]
 
   @type connection_conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
@@ -56,10 +55,13 @@ defmodule Diffusion.Connection do
     end
   end
 
+  def alive?({:n, :l, _} = key) do
+    Process.alive?(:gproc.lookup_pid(key))
+  end
 
   def close(connection) do
     # todo: is this enough?
-    send connection.via, :kill
+    send {:via, :gproc, connection.aka}, :kill
   end
 
 
@@ -88,7 +90,7 @@ defmodule Diffusion.Connection do
   ##
 
   def init(opts) do
-    # Process.flag(:trap_exit, true)
+    Process.flag(:trap_exit, true)
     Logger.debug "session opts #{inspect opts}"
 
     send self(), :connect
@@ -102,7 +104,7 @@ defmodule Diffusion.Connection do
     case Websocket.open_websocket(state) do
       {:ok, connection} ->
         new_state = %{mref: Process.monitor(connection), connection: connection}
-        send owner, {:connected, %Connection{via: key(host), host: host, path: path}}
+        send owner, {:connected, %Connection{aka: key(host), host: host, path: path}}
         {:noreply, Map.merge(state, new_state)}
       error ->
         send owner, error
@@ -111,11 +113,11 @@ defmodule Diffusion.Connection do
   end
 
 
-  def handle_info({:DOWN, mref, :process, _, reason}, %{mref: mref} = state) do
+  def handle_info({:DOWN, mref, :process, _, reason}, %{mref: mref}) do
     exit({:connection_process_down, reason})
   end
 
-  def handle_info({:gun_down, _, :ws, :closed, _, _}, state) do
+  def handle_info({:gun_down, _, :ws, :closed, _, _}, _) do
     exit({:connection_process_down, "monitor down"})
   end
 
@@ -143,19 +145,15 @@ defmodule Diffusion.Connection do
   end
 
 
-  def terminate(_reason, %{connection: connection} = state) do
-    Logger.info "State when terminating #{inspect state}"
+  def terminate(:shutdown, state) do
+    Logger.debug "State when terminating #{inspect state}"
 
-    case Websocket.close(connection) do
+    case Websocket.close(state.connection) do
       :ok ->
         Logger.debug "Connection closed"
-      _error ->
-        Logger.error "Unable to close connection"
+      error ->
+        Logger.error "Unable to close connection: #{inspect error}"
     end
-    :shutdown
-  end
-
-  def terminate(_, _) do
     :shutdown
   end
 end
