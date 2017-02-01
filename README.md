@@ -1,6 +1,6 @@
 # DiffusionClient
 
-A tool for consuming data from [Diffusion](https://www.pushtechnology.com/products/diffusio) topics over Websockets.
+An OTP application for consuming data from [Diffusion](https://www.pushtechnology.com/products/diffusio) topics over Websocket.
 
 
 ## Installation
@@ -31,7 +31,7 @@ iex> defmodule ExampleTopicHandler do
 
   use TopicHandler
 
-    # callbacks
+  # callbacks
   def topic_init(topic) do
     Logger.info "Topic init #{topic}"
     {:ok, %{}}
@@ -44,14 +44,26 @@ iex> defmodule ExampleTopicHandler do
 end
 
 iex> {:ok, connection} = Diffusion.Client.connect("demo.pushtechnology.com", 80, "/diffusion?t=Commands&v=4&ty=WB", 5000, [])
-iex> msg = %DataMessage{type: 21, headers: ["Commands", "0", "LOGON"], data: "pass\u{02}password"}
-iex> :ok = Diffusion.Client.send(connection, msg)
-iex> :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/B")
-iex> :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/O")
+
+iex> ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/B")
+iex> ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/O")
 
 ...
+21:35:07.539 [info]  Topic init Assets/FX/EURUSD/O
 
-00:50:13.427 [info]  Assets/FX/EURUSD/B: DELTA -> %Diffusion.Websocket.Protocol.DataMessage{data: "1.4528", headers: ["!j4"], type: 21}
+21:35:07.539 [info]  Topic init Assets/FX/GBPUSD/B
 
-00:50:13.427 [info]  Assets/FX/EURUSD/O: DELTA -> %Diffusion.Websocket.Protocol.DataMessage{data: "1.4530", headers: ["!j5"], type: 21}
+21:35:09.255 [info]  #PID<0.166.0> ->  Assets/FX/GBPUSD/B: DELTA -> %Diffusion.Websocket.Protocol.Delta{data: "1.6709", topic_alias: "!je", type: 21}
+
+21:35:07.865 [info]  #PID<0.165.0> ->  Assets/FX/EURUSD/O: DELTA -> %Diffusion.Websocket.Protocol.Delta{data: "1.4541", topic_alias: "!j5", type: 21}
+
+21:35:09.997 [info]  #PID<0.166.0> ->  Assets/FX/GBPUSD/B: DELTA -> %Diffusion.Websocket.Protocol.Delta{data: "1.6707", topic_alias: "!je", type: 21}
+
+21:35:11.067 [info]  #PID<0.165.0> ->  Assets/FX/EURUSD/O: DELTA -> %Diffusion.Websocket.Protocol.Delta{data: "1.4539", topic_alias: "!j5", type: 21}
 ```
+
+
+## TODO
+
+- Implement delta handler as a GenStage stream
+- Proper testing

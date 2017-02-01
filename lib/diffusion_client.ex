@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.{Connection, ConnectionSup}
+  alias Diffusion.Connection
   alias Diffusion.Websocket.Protocol
   alias Protocol.DataMessage
 
@@ -28,7 +28,6 @@ defmodule Diffusion.Client do
         error
     end
   end
-
 
 
   @spec send(Connection.t, DataMessage.t) :: :ok | {:error, :connection_down}

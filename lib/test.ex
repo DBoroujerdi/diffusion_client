@@ -8,11 +8,9 @@ defmodule Test do
   def test do
     {:ok, connection} = Diffusion.Client.connect("demo.pushtechnology.com", 80, "/diffusion?t=Commands&v=4&ty=WB", 5000, [])
 
-    :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/B")
-    # :ok = ExampleTopicHandler.new(connection, "Assets/FX/EURUSD/O")
-    # :ok = ExampleTopicHandler.new(connection, "Assets/FX/GBPUSD/B")
-
-    connection
+    ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/B")
+    ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/O")
+    ExampleTopicHandler.start_link(connection, "Assets/FX/GBPUSD/B")
   end
 end
 

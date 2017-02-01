@@ -1,5 +1,37 @@
 require Logger
 
+defmodule Diffusion.ConnectionSup do
+  alias Diffusion.{Connection}
+
+  use Supervisor
+
+
+  @spec start_link(map) :: Supervisor.on_start
+
+  def start_link(%{host: host} = config) do
+    Supervisor.start_link(__MODULE__, config, name: via(host))
+  end
+
+
+  def via(name) do
+    {:via, :gproc, key(name)}
+  end
+
+  def key(name) do
+    {:n, :l, {__MODULE__, name}}
+  end
+
+
+  def init(config) do
+    Logger.debug "Connection supervisor started."
+
+    child_spec = worker(Connection, [config])
+
+    supervise([child_spec], strategy: :one_for_one, restart: :permanent)
+  end
+end
+
+
 defmodule Diffusion.Connection do
   alias Diffusion.{Connection, TopicHandler, Websocket}
   alias Diffusion.Websocket.Protocol
