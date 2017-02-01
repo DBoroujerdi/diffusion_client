@@ -117,6 +117,16 @@ defmodule Diffusion.Connection do
     end
   end
 
+
+  @spec subscribe(Connection.t) :: :ok | :error
+
+  def subscribe(connection) do
+    case :gproc_ps.subscribe(:l, {:connection_event, connection.host}) do
+      true -> :ok
+      _ -> :error
+    end
+  end
+
   # callbacks
 
   ##
@@ -132,14 +142,15 @@ defmodule Diffusion.Connection do
 
   ##
 
-  def handle_info(:connect, %{owner: owner, host: host, path: path} = state) do
+  def handle_info(:connect, %{host: host, path: path} = state) do
     case Websocket.open_websocket(state) do
-      {:ok, connection} ->
-        new_state = %{mref: Process.monitor(connection), connection: connection}
-        send owner, {:connected, %Connection{aka: key(host), host: host, path: path}}
+      {:ok, socket} ->
+        connection = %Connection{aka: key(host), host: host, path: path}
+        new_state = %{mref: Process.monitor(socket), socket: socket, connection: connection}
+        send state.owner, {:connected, connection}
         {:noreply, Map.merge(state, new_state)}
       error ->
-        send owner, error
+        send state.owner, error
         {:noreply, state}
     end
   end
@@ -160,9 +171,9 @@ defmodule Diffusion.Connection do
       {:error, reason} ->
         Logger.error "error decoding #{inspect reason}"
       %Ping{} ->
-        Websocket.send(state.connection, data)
+        Websocket.send(state.socket, data)
       decoded ->
-        TopicHandler.handle(decoded)
+        TopicHandler.handle(state.connection, decoded)
     end
 
     {:noreply, state}
@@ -171,16 +182,19 @@ defmodule Diffusion.Connection do
 
   ##
 
-  def handle_cast({:send, data}, %{connection: connection} = state) when is_binary(data) do
-    :ok = Websocket.send(connection, data)
+  def handle_cast({:send, data}, state) when is_binary(data) do
+    :ok = Websocket.send(state.socket, data)
     {:noreply, state}
   end
 
 
-  def terminate(:shutdown, state) do
-    Logger.debug "State when terminating #{inspect state}"
 
-    case Websocket.close(state.connection) do
+  def terminate({:connection_process_down, _}, _) do
+    :shutdown
+  end
+
+  def terminate(:shutdown, state) do
+    case Websocket.close(state.socket) do
       :ok ->
         Logger.debug "Connection closed"
       error ->

@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.TopicHandler do
   alias Diffusion.Connection
   alias Diffusion.Websocket.Protocol
-  alias Protocol.{Delta, TopicLoad, Message}
+  alias Protocol.{Delta, TopicLoad, Message, ConnectionResponse}
 
 
   use GenServer
@@ -16,17 +16,6 @@ defmodule Diffusion.TopicHandler do
   @callback topic_delta(topic, delta, state) :: {:ok, state}
 
 
-
-  def handle(message) do
-    case to_event(message) do
-      :nil ->
-        Logger.error "unable to convert to event: #{inspect message}"
-      event ->
-        Logger.debug "#{inspect event} -> #{inspect message}"
-        :gproc_ps.publish(:l, event, message)
-    end
-  end
-
   # todo: a topic handler should timeout and die if no message has been recieved for a configurable time
 
   @doc false
@@ -34,7 +23,7 @@ defmodule Diffusion.TopicHandler do
     quote do
       @behaviour unquote(__MODULE__)
 
-      def start_link(connection, topic) do
+      def start_link(connection, topic, opts \\ []) do
         GenServer.start_link(__MODULE__, [topic: topic, connection: connection], name: via({connection.host, topic}))
       end
 
@@ -43,20 +32,21 @@ defmodule Diffusion.TopicHandler do
       end
 
       def init(args) do
-        Logger.debug "initing with args #{inspect args}"
-
-        topic = Keyword.get(args, :topic)
-        connection = Keyword.get(args, :connection)
+        topic       = Keyword.get(args, :topic)
+        connection  = Keyword.get(args, :connection)
+        resub_delay = Keyword.get(args, :resub_delay, 1000)
 
         Logger.debug "initing handler for topic #{inspect topic}"
-        :gproc_ps.subscribe(:l, {:topic_message, topic})
 
-        send self(), :init
+        :gproc_ps.subscribe(:l, {:topic_message, topic})
+        Connection.subscribe(connection)
+
+        send self(), :subscribe
 
         connection_pid = :gproc.lookup_pid(connection.aka)
         if Process.alive?(connection_pid) do
           Process.monitor(:gproc.lookup_pid(connection.aka))
-          {:ok, %{connection: connection, topic: topic, callback_state: %{}}}
+          {:ok, %{connection: connection, topic: topic, resub_delay: resub_delay, callback_state: %{}}}
         else
           {:stop, :connection_down}
         end
@@ -65,17 +55,25 @@ defmodule Diffusion.TopicHandler do
       # todo: timeout waiting for topic to load
 
       def handle_info({:DOWN, _, :process, _, _}, state) do
-        Logger.error "Connection is down! restarting handler"
-        exit(:connection_down)
+        Process.send_after(self(), :subscribe, state.resub_delay)
+        {:noreply, state}
       end
 
-      def handle_info(:init, state) do
-        Logger.debug "initializing topic handler.."
+      def handle_info(:subscribe, state) do
+        Logger.debug "initializing topic subscription.."
         bin = Protocol.encode(%Message{type: 22, headers: [state.topic]})
         :ok = Connection.send_data(state.connection.aka, bin)
         {:noreply, state}
       end
 
+
+      def handle_info({:gproc_ps_event, :diffusion_reconnection}, message, state) do
+        Logger.debug "diffusion reconnection #{inspect message}"
+        send self(), :subscribe
+        {:noreply, state}
+      end
+
+      # todo: inline matching between event topic and state topic
       def handle_info({:gproc_ps_event, {:topic_message, _}, message}, state) do
         Logger.debug "handling #{inspect message}"
         case handle_message(message, state) do
@@ -88,14 +86,21 @@ defmodule Diffusion.TopicHandler do
 
       def terminate(reason, state) do
         :error_logger.error_info(reason)
+
+        :shutdown
       end
 
 
       defp handle_message(message, state) do
         Logger.debug "message #{inspect message}"
         case message do
-          %TopicLoad{topic: topic, topic_alias: topic_alias} ->
-            :gproc_ps.subscribe(:l, {:topic_message, topic_alias})
+          %TopicLoad{topic: topic, topic_alias: topic_alias} = m ->
+            try do
+              :gproc_ps.subscribe(:l, {:topic_message, topic_alias})
+            rescue
+              _ -> Logger.warn "Already subbed"
+            end
+
             __MODULE__.topic_init(topic)
           %Delta{} ->
             __MODULE__.topic_delta(state.topic, message, state.callback_state)
@@ -107,14 +112,28 @@ defmodule Diffusion.TopicHandler do
   end
 
 
-  ##
+  def handle(connection, message) do
+    case to_event(message) do
+      :nil ->
+        Logger.error "unable to convert to event: #{inspect message}"
+      :reconnection ->
+        :gproc_ps.publish(:l, {:reconnection, connection.host}, message)
+      event ->
+        Logger.debug "#{inspect event} -> #{inspect message}"
+      :gproc_ps.publish(:l, event, message)
+    end
+  end
 
+
+  # todo: new module abraction - diffusion event
   defp to_event(message) do
     case message do
       %TopicLoad{topic: topic} ->
         {:topic_message, topic}
       %Delta{topic_alias: topic_alias} ->
         {:topic_message, topic_alias}
+      %ConnectionResponse{} ->
+        :diffusion_reconnection
       _ ->
         :nil
     end

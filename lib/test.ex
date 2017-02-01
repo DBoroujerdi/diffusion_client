@@ -11,6 +11,8 @@ defmodule Test do
     ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/B")
     ExampleTopicHandler.start_link(connection, "Assets/FX/EURUSD/O")
     ExampleTopicHandler.start_link(connection, "Assets/FX/GBPUSD/B")
+
+    connection
   end
 end
 
