@@ -2,7 +2,6 @@ defmodule Diffusion.Event do
   alias Diffusion.Websocket.Protocol
   alias Protocol.{Delta, TopicLoad, ConnectionResponse, Ping}
 
-  # todo: doc to describe what this module does
 
   @type t :: topic_message_event | reconnection_event
 

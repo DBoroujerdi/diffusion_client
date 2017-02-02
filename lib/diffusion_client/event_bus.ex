@@ -3,8 +3,6 @@ defmodule Diffusion.EventBus do
   alias Diffusion.Websocket.Protocol
 
 
-  # todo: unit test!!
-
   @doc """
   Subscribe to an event of type Event.t or a list of Event.t.
 

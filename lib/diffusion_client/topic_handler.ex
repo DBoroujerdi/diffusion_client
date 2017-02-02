@@ -35,6 +35,7 @@ defmodule Diffusion.TopicHandler do
         topic       = Keyword.get(args, :topic)
         connection  = Keyword.get(args, :connection)
         resub_delay = Keyword.get(args, :resub_delay, 1000)
+        timeout     = Keyword.get(args, :timeout, 5 * 60 * 1000)
 
         Logger.debug "initing handler for topic #{inspect topic}"
 
@@ -47,13 +48,11 @@ defmodule Diffusion.TopicHandler do
 
         if Connection.alive?(connection) do
           Process.monitor(:gproc.lookup_pid(connection.aka))
-          {:ok, %{connection: connection, topic: topic, resub_delay: resub_delay, callback_state: %{}}}
+          {:ok, %{connection: connection, topic: topic, resub_delay: resub_delay, timeout: timeout, callback_state: %{}}}
         else
           {:stop, :connection_down}
         end
       end
-
-      # todo: timeout waiting for topic to load
 
       def handle_info({:DOWN, _, :process, _, _}, state) do
         Process.send_after(self(), :subscribe, state.resub_delay)
@@ -79,9 +78,9 @@ defmodule Diffusion.TopicHandler do
         Logger.debug "handling #{inspect message}"
         case handle_message(message, state) do
           {:ok, callback_state} ->
-            {:noreply, Map.put(state, :callback_state, callback_state)}
+            {:noreply, Map.put(state, :callback_state, callback_state), state.timeout}
           :unhandled ->
-            {:noreply, state}
+            {:noreply, state, state.timeout}
         end
       end
 
