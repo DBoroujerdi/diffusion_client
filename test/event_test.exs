@@ -4,7 +4,7 @@ defmodule Diffusion.EventTest do
   alias Protocol.{ConnectionResponse, Message, TopicLoad, Delta, Ping}
 
   use ExSpec
-  doctest Diffusion.Websocket.Protocol
+  doctest Diffusion.Event
 
   describe "events" do
 
