@@ -1,9 +1,9 @@
 require Logger
 
 defmodule Diffusion.TopicHandler do
-  alias Diffusion.{Connection, Event}
+  alias Diffusion.{Connection, Event, EventBus}
   alias Diffusion.Websocket.Protocol
-  alias Protocol.{Delta, TopicLoad, Message, ConnectionResponse}
+  alias Protocol.{Delta, TopicLoad, Message}
 
 
   use GenServer
@@ -38,9 +38,10 @@ defmodule Diffusion.TopicHandler do
 
         Logger.debug "initing handler for topic #{inspect topic}"
 
-        # todo: when gproc is abstracted away, try and turn this into a single subscription call
-        :gproc_ps.subscribe(:l, {:diffusion_topic_message, topic})
-        Connection.subscribe(connection)
+        :ok = EventBus.subscribe([
+          {:diffusion_topic_message, topic},
+          {:diffusion_connection_event, connection.host}
+        ])
 
         send self(), :subscribe
 
@@ -68,14 +69,14 @@ defmodule Diffusion.TopicHandler do
       end
 
 
-      def handle_info({:gproc_ps_event, :diffusion_reconnection}, message, state) do
+      def handle_info({:diffusion_event, :diffusion_reconnection}, message, state) do
         Logger.debug "diffusion reconnection #{inspect message}"
         send self(), :subscribe
         {:noreply, state}
       end
 
-      # todo: inline matching between event topic and state topic
-      def handle_info({:gproc_ps_event, {:diffusion_topic_message, _}, message}, state) do
+
+      def handle_info({:diffusion_event, {:diffusion_topic_message, _}, message}, state) do
         Logger.debug "handling #{inspect message}"
         case handle_message(message, state) do
           {:ok, callback_state} ->
@@ -96,11 +97,8 @@ defmodule Diffusion.TopicHandler do
         Logger.debug "message #{inspect message}"
         case message do
           %TopicLoad{topic: topic, topic_alias: topic_alias} = m ->
-            try do
-              :gproc_ps.subscribe(:l, {:diffusion_topic_message, topic_alias})
-            rescue
-              _ -> Logger.warn "Already subbed"
-            end
+
+            :ok = EventBus.subscribe({:diffusion_topic_message, topic_alias})
 
             __MODULE__.topic_init(topic)
           %Delta{} ->
@@ -118,10 +116,10 @@ defmodule Diffusion.TopicHandler do
       :nil ->
         Logger.error "unable to convert to event: #{inspect message}"
       :reconnection ->
-        :gproc_ps.publish(:l, {:reconnection, connection.host}, message)
+        EventBus.publish({:reconnection, connection.host}, message)
       event ->
         Logger.debug "#{inspect event} -> #{inspect message}"
-      :gproc_ps.publish(:l, event, message)
+        EventBus.publish(event, message)
     end
   end
 end

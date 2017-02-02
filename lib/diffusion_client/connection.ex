@@ -118,15 +118,6 @@ defmodule Diffusion.Connection do
   end
 
 
-  @spec subscribe(Connection.t) :: :ok | :error
-
-  def subscribe(connection) do
-    case :gproc_ps.subscribe(:l, {:connection_event, connection.host}) do
-      true -> :ok
-      _ -> :error
-    end
-  end
-
   # callbacks
 
   ##
