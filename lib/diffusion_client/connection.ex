@@ -87,8 +87,11 @@ defmodule Diffusion.Connection do
     end
   end
 
-  def alive?({:n, :l, _} = key) do
-    Process.alive?(:gproc.lookup_pid(key))
+
+  @spec alive?(Connection.t) :: boolean
+
+  def alive?(connection) do
+    Process.alive?(:gproc.lookup_pid(connection.aka))
   end
 
   def close(connection) do

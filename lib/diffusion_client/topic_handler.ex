@@ -45,8 +45,7 @@ defmodule Diffusion.TopicHandler do
 
         send self(), :subscribe
 
-        connection_pid = :gproc.lookup_pid(connection.aka)
-        if Process.alive?(connection_pid) do
+        if Connection.alive?(connection) do
           Process.monitor(:gproc.lookup_pid(connection.aka))
           {:ok, %{connection: connection, topic: topic, resub_delay: resub_delay, callback_state: %{}}}
         else
