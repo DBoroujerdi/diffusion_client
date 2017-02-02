@@ -1,7 +1,7 @@
 require Logger
 
 defmodule Diffusion.TopicHandler do
-  alias Diffusion.Connection
+  alias Diffusion.{Connection, Event}
   alias Diffusion.Websocket.Protocol
   alias Protocol.{Delta, TopicLoad, Message, ConnectionResponse}
 
@@ -38,7 +38,8 @@ defmodule Diffusion.TopicHandler do
 
         Logger.debug "initing handler for topic #{inspect topic}"
 
-        :gproc_ps.subscribe(:l, {:topic_message, topic})
+        # todo: when gproc is abstracted away, try and turn this into a single subscription call
+        :gproc_ps.subscribe(:l, {:diffusion_topic_message, topic})
         Connection.subscribe(connection)
 
         send self(), :subscribe
@@ -74,7 +75,7 @@ defmodule Diffusion.TopicHandler do
       end
 
       # todo: inline matching between event topic and state topic
-      def handle_info({:gproc_ps_event, {:topic_message, _}, message}, state) do
+      def handle_info({:gproc_ps_event, {:diffusion_topic_message, _}, message}, state) do
         Logger.debug "handling #{inspect message}"
         case handle_message(message, state) do
           {:ok, callback_state} ->
@@ -96,7 +97,7 @@ defmodule Diffusion.TopicHandler do
         case message do
           %TopicLoad{topic: topic, topic_alias: topic_alias} = m ->
             try do
-              :gproc_ps.subscribe(:l, {:topic_message, topic_alias})
+              :gproc_ps.subscribe(:l, {:diffusion_topic_message, topic_alias})
             rescue
               _ -> Logger.warn "Already subbed"
             end
@@ -113,7 +114,7 @@ defmodule Diffusion.TopicHandler do
 
 
   def handle(connection, message) do
-    case to_event(message) do
+    case Event.event_type_for(message) do
       :nil ->
         Logger.error "unable to convert to event: #{inspect message}"
       :reconnection ->
@@ -121,21 +122,6 @@ defmodule Diffusion.TopicHandler do
       event ->
         Logger.debug "#{inspect event} -> #{inspect message}"
       :gproc_ps.publish(:l, event, message)
-    end
-  end
-
-
-  # todo: new module abraction - diffusion event
-  defp to_event(message) do
-    case message do
-      %TopicLoad{topic: topic} ->
-        {:topic_message, topic}
-      %Delta{topic_alias: topic_alias} ->
-        {:topic_message, topic_alias}
-      %ConnectionResponse{} ->
-        :diffusion_reconnection
-      _ ->
-        :nil
     end
   end
 end
