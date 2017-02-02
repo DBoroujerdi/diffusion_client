@@ -94,6 +94,9 @@ defmodule Diffusion.Connection do
     Process.alive?(:gproc.lookup_pid(connection.aka))
   end
 
+
+  @spec close(Connection.t) :: :ok
+
   def close(connection) do
     # todo: is this enough?
     send {:via, :gproc, connection.aka}, :kill
