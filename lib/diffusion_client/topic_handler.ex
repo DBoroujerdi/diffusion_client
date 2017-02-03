@@ -109,12 +109,12 @@ defmodule Diffusion.TopicHandler do
   end
 
 
-  def handle(connection, message) do
+  def handle(host, message) do
     case Event.event_type_for(message) do
       :nil ->
         Logger.error "unable to convert to event: #{inspect message}"
       :reconnection ->
-        EventBus.publish({:reconnection, connection.host}, message)
+        EventBus.publish({:reconnection, host}, message)
       event ->
         Logger.debug "#{inspect event} -> #{inspect message}"
         EventBus.publish(event, message)

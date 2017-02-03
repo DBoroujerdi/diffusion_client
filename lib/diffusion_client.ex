@@ -45,7 +45,7 @@ defmodule Diffusion.Client do
   @spec close_connection(Connection.t) :: :ok | {:error, any}
 
   def close_connection(connection) do
-    Diffusion.Supervisor.stop_child(connection)
+    Connection.close(connection)
   end
 
 
