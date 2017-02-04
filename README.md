@@ -1,6 +1,6 @@
 # DiffusionClient
 
-An OTP application for consuming data from [Diffusion](https://www.pushtechnology.com/products/diffusio) topics over Websocket.
+An OTP application for consuming data from [Diffusion](https://www.pushtechnology.com/products/diffusion) topics over Websocket.
 
 
 ## Installation
