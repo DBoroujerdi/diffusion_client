@@ -21,7 +21,7 @@ defmodule ExampleTopicHandler do
 
   use TopicHandler
 
-    # callbacks
+  # callbacks
   def topic_init(topic) do
     Logger.info "Topic init #{topic}"
     {:ok, %{}}

@@ -26,7 +26,8 @@ defmodule DiffusionClient.Mixfile do
       {:uuid, "~> 1.1"},
       {:monad, "~> 1.0"},
       {:dialyxir, "~> 0.4", only: [:dev], runtime: false},
-      {:ex_spec, "~> 2.0", only: :test}
+      {:ex_spec, "~> 2.0", only: :test},
+      {:mock, "~> 0.2.0", only: :test}
     ]
   end
 end
