@@ -21,9 +21,9 @@ defmodule Diffusion.Websocket do
   end
 
 
-  @spec open_websocket(map) :: {:ok, pid} | {:error, any}
+  @spec open(map) :: {:ok, pid} | {:error, any}
 
-  def open_websocket(config) do
+  def open(config) do
     case open_connection(config) do
       {:ok, connection} ->
         with {:ok, _} <- wait_up(connection, config)

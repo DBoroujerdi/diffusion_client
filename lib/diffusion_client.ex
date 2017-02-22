@@ -3,7 +3,7 @@ require Logger
 defmodule Diffusion.Client do
   use Application
 
-  alias Diffusion.Connection
+  alias Diffusion.Session
   alias Diffusion.Websocket.Protocol
   alias Protocol.DataMessage
 
@@ -11,41 +11,41 @@ defmodule Diffusion.Client do
   # API functions
 
   @doc """
-  Connect to diffusion server at host:port/path. Initiates connection and returns
+  Connect to diffusion server at host:port/path. Initiates session and returns
   a session struct representing the session. This session should be used
   in all interactions with the client.
   """
 
-  @spec connect(String.t, number, String.t, opts) :: {:ok, Connection.t} | {:error, any} when opts: [atom: any]
+  @spec connect(String.t, number, String.t, opts) :: {:ok, Session.t} | {:error, any} when opts: [atom: any]
 
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."
 
     case validate_opts(opts) do
       :valid ->
-        Connection.new(host, port, path, timeout, opts)
+        Session.new(host, port, path, timeout, opts)
       error ->
         error
     end
   end
 
 
-  @spec send(Connection.t, DataMessage.t) :: :ok | {:error, :connection_down}
+  @spec send(Session.t, DataMessage.t) :: :ok | {:error, :session_down}
 
-  def send(connection, data) do
-    Connection.send_data(connection.aka, Protocol.encode(data))
+  def send(session, data) do
+    Session.send_data(session.aka, Protocol.encode(data))
   end
 
 
   @doc """
-  Close a connection. All topic subscriptions consuming from the connection
+  Close a session. All topic subscriptions consuming from the session
   will also close as a result.
   """
 
-  @spec close_connection(Connection.t) :: :ok | {:error, any}
+  @spec close_session(Session.t) :: :ok | {:error, any}
 
-  def close_connection(connection) do
-    Connection.close(connection)
+  def close_session(session) do
+    Session.close(session)
   end
 
 
@@ -59,7 +59,7 @@ defmodule Diffusion.Client do
   def start(_, _) do
     Logger.info "Starting DiffusionClient"
 
-    # todo: support starting connection and subscriptions
+    # todo: support starting session and subscriptions
     # from config
 
     Diffusion.Supervisor.start_link()

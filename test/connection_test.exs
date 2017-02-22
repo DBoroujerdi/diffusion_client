@@ -1,25 +1,51 @@
-defmodule Diffusion.Connection.Test do
+defmodule Diffusion.ConnectionTest do
   alias Diffusion.{Connection, Websocket}
-  use ExSpec, async: true
+  use ExSpec, async: false
 
   import Mock
 
-  setup do
-    # with_mock Websocket, [open_websocket: fn(_) -> FakeSocket.start_link() end] do
-    #   {:ok, connection} = Connection.start_link(%{host: "host", path: "/path", owner: self()})
-    #   receive do
-    #     {:connected, _} ->
-    #       {:ok, connection: connection}
-    #     error ->
-    #       flunk()
-    #   end
-    # end
-    :ok
+  setup_all do
+    with_mock Websocket, [
+      open: fn(_) -> FakeSocket.start_link() end
+    ] do
+
+      {:ok, _} = Connection.start_link(%{host: "host", path: "/path", owner: self()})
+      connection_pid = receive do
+        {:started, pid} ->
+          pid
+        error ->
+          flunk()
+      end
+
+      assert Connection.alive?(connection_pid) == true
+
+      {:ok, connection_pid: connection_pid}
+    end
   end
 
-  # test "should establish connection", %{connection: connection} do
-  #   assert Connection.alive?(connection) == true
+  test "responds to socket ping with ping", %{connection_pid: connection_pid} do
+    with_mock Websocket, [
+      open: fn(_) -> FakeSocket.start_link() end,
+      close: fn(_) -> :ok end
+    ] do
+      assert Connection.alive?(connection_pid) == true
+
+      Connection.close(connection_pid)
+    end
+  end
+
+  # test "reconnects on :gun_down" do
   # end
+
+  # test "reconnects when gun socket process dies" do
+  # end
+
+  # test "closes gun socket on terminate" do
+  # end
+
+  # test "sends data to socket" do
+  # end
+
 end
 
 

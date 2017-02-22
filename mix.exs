@@ -27,7 +27,9 @@ defmodule DiffusionClient.Mixfile do
       {:monad, "~> 1.0"},
       {:dialyxir, "~> 0.4", only: [:dev], runtime: false},
       {:ex_spec, "~> 2.0", only: :test},
-      {:mock, "~> 0.2.0", only: :test}
+      {:mock, "~> 0.2.0", only: :test},
+      {:cowboy, git: "https://github.com/ninenines/cowboy.git"},
+      {:ranch, git: "https://github.com/ninenines/ranch.git", override: true}
     ]
   end
 end

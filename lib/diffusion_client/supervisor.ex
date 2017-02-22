@@ -1,7 +1,7 @@
 require Logger
 
 defmodule Diffusion.Supervisor do
-  alias Diffusion.ConsumerSup
+  alias Diffusion.ConnectionSup
 
   use Supervisor
 
@@ -13,10 +13,10 @@ defmodule Diffusion.Supervisor do
   end
 
 
-  @spec start_socket_consumer(map) :: Supervisor.on_start_child
+  @spec start_socket_connection(map) :: Supervisor.on_start_child
 
-  def start_socket_consumer(%{host: id} = config) do
-    child = supervisor(ConsumerSup, [config], [id: id, restart: :permanent])
+  def start_socket_connection(%{host: id} = config) do
+    child = supervisor(ConnectionSup, [config], [id: id, restart: :permanent])
 
     Logger.debug "Adding new connection with id [#{id}] with config: #{inspect config}"
 

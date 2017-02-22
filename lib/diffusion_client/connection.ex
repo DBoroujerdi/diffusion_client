@@ -1,55 +1,161 @@
 require Logger
 
+defmodule Diffusion.ConnectionSup do
+  alias Diffusion.Connection
+
+  use Supervisor
+
+  @spec start_link(map) :: Supervisor.on_start
+
+  def start_link(%{host: host} = config) do
+    Supervisor.start_link(__MODULE__, config, name: via(host))
+  end
+
+
+  def via(name) do
+    {:via, :gproc, key(name)}
+  end
+
+  def key(name) do
+    {:n, :l, {__MODULE__, name}}
+  end
+
+  def init(config) do
+    Logger.debug "Connection supervisor started."
+
+    child_spec = worker(Connection, [config])
+
+    supervise([child_spec], strategy: :one_for_one, restart: :permanent)
+  end
+end
+
+
 defmodule Diffusion.Connection do
-  alias Diffusion.{Connection, TopicHandler, Websocket}
+  alias Diffusion.{TopicHandler, Websocket}
   alias Diffusion.Websocket.Protocol
   alias Protocol.Ping
 
-  @type t :: %Connection{aka: tuple, host: String.t, path: String.t}
+  use GenServer
 
-  defstruct [:aka, :host, :host, :path]
+  @type conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
 
 
-  @spec new(binary, number, binary, pos_integer, opts) :: {:ok, Connection.t} | {:error, any}
-        when opts: [{atom, any}]
+  # API
 
-  def new(host, port, path, timeout, opts) do
-    config = opts ++ [host: host, port: port, path: path, timeout: timeout, owner: self()]
-    |> Enum.into(%{})
+  @spec start_link(opts) :: GenServer.on_start when opts: [{:id, String.t}]
 
-    case Diffusion.Supervisor.start_socket_consumer(config) do
-      {:ok, pid} ->
-        receive do
-          {:started, consumer_via} ->
-            {:ok, %Connection{aka: consumer_via, host: host, path: path}}
-          error ->
-            Diffusion.Supervisor.stop_child(pid)
-            error
-        after timeout
-            -> {:error, :timeout}
-        end
-      error -> error
-    end
+  def start_link(opts) do
+    Logger.info "#{inspect opts}"
+    GenServer.start_link(__MODULE__, opts)
   end
 
 
-  @spec alive?(Connection.t) :: boolean
+  @spec alive?(pid) :: boolean
 
-  def alive?(connection) do
-    Process.alive?(:gproc.lookup_pid(connection.aka))
+  def alive?(pid) do
+    Process.alive?(pid)
   end
 
 
-  @spec close(Connection.t) :: :ok | {:error, any}
+  @spec close(pid) :: :ok
 
-  def close(connection) do
-    Diffusion.Supervisor.stop_child(connection)
+  def close(pid) do
+    Logger.debug "closing connection.."
+    GenServer.stop(pid)
   end
 
 
   @spec send_data(identifier, String.t) :: :ok when identifier: tuple | pid
 
-  def send_data({:n, :l, _} = key, data) when is_binary(data) do
-    GenServer.cast({:via, :gproc, key}, {:send, data})
+  def send_data(pid, data) when is_binary(data) do
+    GenServer.cast(pid, {:send, data})
+  end
+
+
+  # callbacks
+
+  def init(opts) do
+    Process.flag(:trap_exit, true)
+    Logger.debug "consumer opts #{inspect opts}"
+
+    send self(), :connect
+
+    {:ok, opts}
+  end
+
+
+  def handle_info(:connect, state) do
+    {:noreply, connect(state)}
+  end
+
+
+  def handle_info({:DOWN, mref, :process, _, _reason}, %{mref: mref} = state) do
+    {:noreply, connect(state)}
+  end
+
+  def handle_info({:gun_down, _, :ws, :closed, _, _}, state) do
+    {:noreply, connect(state)}
+  end
+
+  def handle_info({:gun_ws, _, {:text, data}}, state) do
+    Logger.debug data
+
+    case Protocol.decode(data) do
+      {:error, reason} ->
+        Logger.error "error decoding #{inspect reason}"
+      %Ping{} = ping ->
+        TopicHandler.publish(state.host, ping)
+        Websocket.send(state.socket, data)
+      decoded ->
+        TopicHandler.publish(state.host, decoded)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_info(_, state) do
+    {:noreply, state}
+  end
+
+
+  ##
+
+  def handle_cast({:send, data}, state) when is_binary(data) do
+    :ok = Websocket.send(state.socket, data)
+    {:noreply, state}
+  end
+
+
+  def terminate({:connection_process_down, _}, _) do
+    :shutdown
+  end
+
+  def terminate(:shutdown, state) do
+    Logger.info "closing socket"
+    case Websocket.close(state.socket) do
+      :ok ->
+        Logger.debug "Connection closed"
+      error ->
+        Logger.error "Unable to close connection: #{inspect error}"
+    end
+    :shutdown
+  end
+
+  def terminate(_reason, _state) do
+    :shutdown
+  end
+
+  #
+
+  defp connect(state) do
+    case Websocket.open(state) do
+      {:ok, socket} ->
+        new_state = %{mref: Process.monitor(socket), socket: socket}
+        # todo: notify handlers via event bus
+        send state.owner, {:started, self()}
+        Map.merge(state, new_state)
+      error ->
+        exit(error)
+    end
   end
 end
