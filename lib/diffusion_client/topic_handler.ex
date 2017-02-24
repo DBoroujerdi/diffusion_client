@@ -1,9 +1,9 @@
 require Logger
 
 defmodule Diffusion.TopicHandler do
-  alias Diffusion.{Connection, Event, EventBus}
+  alias Diffusion.{Session, Event, EventBus}
   alias Diffusion.Websocket.Protocol
-  alias Protocol.{Delta, TopicLoad, Message}
+  alias Protocol.{Delta, TopicLoad, Message, Ping, ConnectionResponse}
 
 
   use GenServer
@@ -23,8 +23,8 @@ defmodule Diffusion.TopicHandler do
     quote do
       @behaviour unquote(__MODULE__)
 
-      def start_link(connection, topic, opts \\ []) do
-        GenServer.start_link(__MODULE__, [topic: topic, connection: connection], name: via({connection.host, topic}))
+      def start_link(session, topic, opts \\ []) do
+        GenServer.start_link(__MODULE__, [topic: topic, session: session], name: via({session.host, topic}))
       end
 
       defp via(name) do
@@ -32,45 +32,51 @@ defmodule Diffusion.TopicHandler do
       end
 
       def init(args) do
-        topic       = Keyword.get(args, :topic)
-        connection  = Keyword.get(args, :connection)
-        resub_delay = Keyword.get(args, :resub_delay, 1000)
-        timeout     = Keyword.get(args, :timeout, 5 * 60 * 1000)
+        topic   = Keyword.get(args, :topic)
+        session = Keyword.get(args, :session)
+        timeout = Keyword.get(args, :timeout, 5 * 60 * 1000)
 
         Logger.debug "initing handler for topic #{inspect topic}"
 
         :ok = EventBus.subscribe([
           {:diffusion_topic_message, topic},
-          {:diffusion_connection_event, connection.host}
+          {:diffusion_event, session.host}
         ])
 
         send self(), :subscribe
 
-        if Connection.alive?(connection) do
-          Process.monitor(:gproc.lookup_pid(connection.aka))
-          {:ok, %{connection: connection, topic: topic, resub_delay: resub_delay, timeout: timeout, callback_state: %{}}}
+        if Session.alive?(session) do
+          Process.monitor(session.aka)
+          {:ok, %{session: session, topic: topic, timeout: timeout, callback_state: %{}}}
         else
-          {:stop, :connection_down}
+          {:stop, :session_down}
         end
       end
 
+
+      def handle_info(:timeout, state) do
+        Logger.warn "Handler timed out"
+        exit(:diffusion_timeout)
+      end
+
       def handle_info({:DOWN, _, :process, _, _}, state) do
-        Process.send_after(self(), :subscribe, state.resub_delay)
-        {:noreply, state}
+        Logger.warn "Session down"
+        exit(:diffusion_session_down)
       end
 
       def handle_info(:subscribe, state) do
-        Logger.debug "initializing topic subscription.."
-        bin = Protocol.encode(%Message{type: 22, headers: [state.topic]})
-        :ok = Connection.send_data(state.connection.aka, bin)
-        {:noreply, state}
+        {:noreply, subscribe(state)}
       end
 
 
-      def handle_info({:diffusion_event, :diffusion_reconnection}, message, state) do
-        Logger.debug "diffusion reconnection #{inspect message}"
-        send self(), :subscribe
-        {:noreply, state}
+      def handle_info({:diffusion_event, {:diffusion_event, _}, msg}, state) do
+        case msg do
+          %Ping{} ->
+            {:noreply, state, state.timeout}
+          %ConnectionResponse{} ->
+            Logger.debug "diffusion connected"
+            {:noreply, subscribe(state), state.timeout}
+        end
       end
 
 
@@ -105,19 +111,29 @@ defmodule Diffusion.TopicHandler do
             :unhandled
         end
       end
+
+      defp subscribe(state) do
+        Logger.debug "initializing topic subscription.."
+        bin = Protocol.encode(%Message{type: 22, headers: [state.topic]})
+        # todo rename to add_topic
+        :ok = Session.send_data(state.session.aka, bin)
+        state
+      end
     end
   end
 
 
-  def handle(host, message) do
-    case Event.event_type_for(message) do
-      :nil ->
-        Logger.error "unable to convert to event: #{inspect message}"
-      :reconnection ->
-        EventBus.publish({:reconnection, host}, message)
-      event ->
-        Logger.debug "#{inspect event} -> #{inspect message}"
-        EventBus.publish(event, message)
-    end
+  def publish(host, message) do
+    event = case message do
+              %TopicLoad{topic: topic} ->
+                {:diffusion_topic_message, topic}
+              %Delta{topic_alias: topic_alias} ->
+                {:diffusion_topic_message, topic_alias}
+              _ ->
+                {:diffusion_event, host}
+            end
+
+    Logger.debug "#{inspect event} -> #{inspect message}"
+    EventBus.publish(event, message)
   end
 end
