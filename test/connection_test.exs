@@ -13,7 +13,7 @@ defmodule Diffusion.ConnectionTest do
       connection_pid = receive do
         {:started, pid} ->
           pid
-        error ->
+        _error ->
           flunk()
       end
 

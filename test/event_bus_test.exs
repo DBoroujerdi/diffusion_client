@@ -1,6 +1,5 @@
 defmodule Diffusion.EventBusTest do
   alias Diffusion.EventBus
-  alias Diffusion.Websocket.Protocol
 
   use ExSpec
   doctest Diffusion.EventBus

@@ -15,7 +15,7 @@ defmodule Diffusion.Client.Test do
     [server_stub: pid]
   end
 
-  test "connection", context do
+  test "connection" do
     {:ok, session} = Client.connect("127.0.0.1", 8080, "/diffusion_ws")
 
     assert Diffusion.ServerStub.connection_established()
