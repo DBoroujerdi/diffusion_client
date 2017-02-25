@@ -76,6 +76,9 @@ defmodule Diffusion.TopicHandler do
           %ConnectionResponse{} ->
             Logger.debug "diffusion connected"
             {:noreply, subscribe(state), state.timeout}
+          _ ->
+            Logger.warn "unexpected message: #{inspect msg}"
+            {:noreply, state, state.timeout}
         end
       end
 
