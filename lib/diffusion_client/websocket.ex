@@ -68,8 +68,10 @@ defmodule Diffusion.Websocket do
 
 
 
-  defp open_connection(%{host: host, port: port}) do
+  defp open_connection(%{host: host, port: port}), do:
     :gun.open(String.to_charlist(host), port)
+  defp open_connection(%{host: host, port: port, transport: :ssl}) do
+    :gun.open(String.to_charlist(host), port, %{transport: :ssl})
   end
 
 
