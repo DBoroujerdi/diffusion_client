@@ -17,9 +17,9 @@ defmodule Diffusion.Websocket.Protocol do
   defmodule Delta do
     @type t :: delta
 
-    @type delta :: %Delta{type: 21, data: String.t, topic_alias: String.t}
+    @type delta :: %Delta{type: 21, data: String.t, topic_alias: String.t, headers: [String.t]}
 
-    defstruct [:type, :data, :topic_alias]
+    defstruct [:type, :data, :topic_alias, headers: []]
   end
 
   defmodule TopicLoad do
@@ -111,8 +111,13 @@ defmodule Diffusion.Websocket.Protocol do
     end
   end
 
-  defp decode_message(21 = type, [topic_alias, data]) do
-    %Delta{type: type, data: data, topic_alias: topic_alias}
+  defp decode_message(21 = type, [headers, data]) do
+    case :binary.split(headers, "\u{02}", [:global]) do
+      [topic_alias] ->
+        %Delta{type: type, data: data, topic_alias: topic_alias}
+      [topic_alias | headers] ->
+        %Delta{type: type, data: data, topic_alias: topic_alias, headers: headers}
+    end
   end
 
   defp decode_message(25 = type, [data, _]) do

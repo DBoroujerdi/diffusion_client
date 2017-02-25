@@ -34,6 +34,12 @@ defmodule Diffusion.Websocket.ProtocolTest do
         assert actual == expected
       end
 
+      it "decodes delta message with additional headers" do
+        expected = %Delta{type: 21, topic_alias: "!142d", data: "foo\u{02}bar\u{02}baz\u{02}bip\u{01}bop\u{02}beep", headers: ["foo", "bar"]}
+        actual = Protocol.decode("\u{15}!142d\u{02}foo\u{02}bar\u{01}foo\u{02}bar\u{02}baz\u{02}bip\u{01}bop\u{02}beep")
+        assert actual == expected
+      end
+
       it "decodes client ping message" do
         bin = "\u{19}1484349590272\u{01}"
         assert Protocol.decode(bin) == %Ping{type: 25, timestamp: "1484349590272"}
