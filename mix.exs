@@ -8,7 +8,8 @@ defmodule DiffusionClient.Mixfile do
       elixir: "~> 1.3",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
-      deps: deps()
+      deps: deps() ++ test_deps(),
+      preferred_cli_env: [espec: :test]
     ]
   end
 
@@ -16,6 +17,15 @@ defmodule DiffusionClient.Mixfile do
     [
       applications: [:logger, :gun, :gproc, :crypto],
       mod: {Diffusion.Client, []}
+    ]
+  end
+
+  defp test_deps do
+    [
+      {:ex_spec, "~> 2.0", only: :test},
+      {:mock, "~> 0.2.0", only: :test},
+      {:ranch, git: "https://github.com/ninenines/ranch.git", override: true},
+      {:dialyxir, "~> 0.4", only: [:dev], runtime: false}
     ]
   end
 

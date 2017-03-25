@@ -2,6 +2,8 @@ require Logger
 
 defmodule Diffusion.Client.Test do
   alias Diffusion.Client
+  alias Diffusion.Stub.Server
+  alias Diffusion.Stub.WebsocketHandler
 
   use ExSpec, async: false
 
@@ -10,14 +12,14 @@ defmodule Diffusion.Client.Test do
 
     {:ok, _} = :application.ensure_all_started(:cowboy)
 
-    {:ok, pid} = Diffusion.ServerStub.start()
+    {:ok, pid} = Server.start()
 
     [server_stub: pid]
   end
 
   test "connection" do
-    {:ok, session} = Client.connect("127.0.0.1", 8080, "/diffusion_ws")
+    {:ok, _} = Client.connect("127.0.0.1", 8080, "/diffusion_ws")
 
-    assert Diffusion.ServerStub.connection_established()
+    assert Server.connection_established()
   end
 end
