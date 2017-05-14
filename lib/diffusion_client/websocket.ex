@@ -1,9 +1,5 @@
 require Logger
 
-require Monad.Error, as: Error
-
-import Error
-
 defmodule Diffusion.Websocket do
 
   @spec send(pid, binary) :: :ok
@@ -43,10 +39,10 @@ defmodule Diffusion.Websocket do
   ##
 
   defp wait_up(connection, config) do
-    Error.p do
+    with {:ok, connection} <- await_up(connection, config),
+	 {:ok, connection} <-  upgrade_to_ws(connection, config)
+      do
       {:ok, connection}
-      |> await_up(config)
-      |> upgrade_to_ws(config)
     end
   end
 
@@ -65,7 +61,6 @@ defmodule Diffusion.Websocket do
   defp upgrade_to_ws(connection, config) do
     upgrade_to_ws(connection, Map.put(config, :headers, []))
   end
-
 
 
   defp open_connection(%{host: host, port: port}), do:

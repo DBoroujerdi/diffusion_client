@@ -34,7 +34,6 @@ defmodule DiffusionClient.Mixfile do
       {:gun, git: "https://github.com/ninenines/gun.git", tag: "bc733a2ca5f7d07f997ad6edf184f775b23434aa"},
       {:gproc, git: "https://github.com/uwiger/gproc.git", tag: "01c8fbfdd5e4701e8e4b57b0c8279872f9574b0b"},
       {:uuid, "~> 1.1"},
-      {:monad, "~> 1.0"},
       {:dialyxir, "~> 0.4", only: [:dev], runtime: false},
       {:ex_spec, "~> 2.0", only: :test},
       {:mock, "~> 0.2.0", only: :test},
