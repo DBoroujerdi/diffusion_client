@@ -33,7 +33,7 @@ end
 
 
 defmodule Diffusion.Consumer do
-  alias Diffusion.{Consumer, TopicHandler, Websocket}
+  alias Diffusion.{TopicHandler, Websocket}
   alias Diffusion.Websocket.Protocol
   alias Protocol.Ping
 
@@ -96,8 +96,8 @@ defmodule Diffusion.Consumer do
 
   ##
 
-  def handle_info(:connect, %{host: host, path: path} = state) do
-    case Websocket.open_websocket(state) do
+  def handle_info(:connect, %{host: host} = state) do
+    case Websocket.open(state) do
       {:ok, socket} ->
         new_state = %{mref: Process.monitor(socket), socket: socket}
         send state.owner, {:started, key(host)}
@@ -126,7 +126,7 @@ defmodule Diffusion.Consumer do
       %Ping{} ->
         Websocket.send(state.socket, data)
       decoded ->
-        TopicHandler.handle(state.host, decoded)
+        TopicHandler.publish(state.host, decoded)
     end
 
     {:noreply, state}
