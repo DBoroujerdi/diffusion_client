@@ -9,7 +9,7 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
 
   1. Add `diffusion_client` to your list of dependencies in `mix.exs`:
 
-    ```elixir
+    ``` elixir
     def deps do
       [{:diffusion_client, "~> 0.1.0"}]
     end
@@ -17,7 +17,7 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
 
   2. Ensure `diffusion_client` is started before your application:
 
-    ```elixir
+    ``` elixir
     def application do
       [applications: [:diffusion_client]]
     end
@@ -38,7 +38,7 @@ iex> defmodule ExampleTopicHandler do
   end
 
   def topic_delta(topic, delta, state) do
-    Logger.info "#{topic}: DELTA -> #{inspect delta}"
+    Logger.info "#{inspect self} -> #{topic}: DELTA -> #{inspect delta}"
     {:ok, state}
   end
 end
