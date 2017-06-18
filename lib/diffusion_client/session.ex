@@ -35,7 +35,8 @@ defmodule Diffusion.Session do
   @spec alive?(Session.t) :: boolean
 
   def alive?(connection) do
-    Process.alive?(connection.aka)
+    pid = :gproc.lookup_pid(connection.aka)
+    Process.alive?(pid)
   end
 
 

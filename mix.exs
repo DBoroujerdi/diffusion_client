@@ -9,7 +9,8 @@ defmodule DiffusionClient.Mixfile do
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       deps: deps() ++ test_deps(),
-      preferred_cli_env: [espec: :test]
+      preferred_cli_env: [espec: :test],
+      dialyzer: [ignore_warnings: "dialyzer.ignore-warnings"]
     ]
   end
 

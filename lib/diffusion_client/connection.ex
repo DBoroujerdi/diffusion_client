@@ -20,6 +20,7 @@ defmodule Diffusion.ConnectionSup do
     {:n, :l, {__MODULE__, name}}
   end
 
+
   def init(config) do
     Logger.debug "Connection supervisor started."
 
@@ -132,12 +133,7 @@ defmodule Diffusion.Connection do
 
   def terminate(:shutdown, state) do
     Logger.info "closing socket"
-    case Websocket.close(state.socket) do
-      :ok ->
-        Logger.debug "Connection closed"
-      error ->
-        Logger.error "Unable to close connection: #{inspect error}"
-    end
+    :ok = Websocket.close(state.socket)
     :shutdown
   end
 

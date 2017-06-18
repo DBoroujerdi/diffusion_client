@@ -16,7 +16,7 @@ defmodule Diffusion.Client do
   in all interactions with the client.
   """
 
-  @spec connect(String.t, number, String.t, opts) :: {:ok, Session.t} | {:error, any} when opts: [atom: any]
+  @spec connect(String.t, number, String.t, number, opts) :: {:ok, Session.t} | {:error, any} when opts: [atom: any]
 
   def connect(host, port \\ 80, path, timeout \\ 5000, opts \\ []) do
     Logger.info "connecting..."

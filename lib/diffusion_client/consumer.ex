@@ -21,7 +21,6 @@ defmodule Diffusion.ConsumerSup do
     {:n, :l, {__MODULE__, name}}
   end
 
-
   def init(config) do
     Logger.debug "Consumer supervisor started."
 
@@ -39,16 +38,16 @@ defmodule Diffusion.Consumer do
 
   use GenServer
 
-  @type conf :: {:host, String.t} | {:port, number} | {:path, String.t} | {:timeout, number} | {:owner, pid}
+  @type config ::  %{:host => String.t, :port => number, :path => String.t, :timeout => number, :owner => pid}
 
 
   # API
 
-  @spec start_link(opts) :: GenServer.on_start when opts: [{:id, String.t}]
+  @spec start_link(config) :: GenServer.on_start
 
-  def start_link(%{host: host} = opts) do
-    Logger.info "#{inspect opts}"
-    GenServer.start_link(__MODULE__, opts, name: via(host))
+  def start_link(%{host: host} = config) do
+    Logger.info "#{inspect config}"
+    GenServer.start_link(__MODULE__, config, name: via(host))
   end
 
 
@@ -68,9 +67,11 @@ defmodule Diffusion.Consumer do
   end
 
 
+  @spec close(tuple) :: :ok
+
   def close(aka) do
-    # todo: is this enough?
-    send {:via, :gproc, aka}, :kill
+    send :gproc.lookup_pid(aka), :kill
+    :ok
   end
 
 
@@ -147,12 +148,8 @@ defmodule Diffusion.Consumer do
   end
 
   def terminate(:shutdown, state) do
-    case Websocket.close(state.socket) do
-      :ok ->
-        Logger.debug "Consumer closed"
-      error ->
-        Logger.error "Unable to close connection: #{inspect error}"
-    end
+    :ok = Websocket.close(state.socket)
+
     :shutdown
   end
 
