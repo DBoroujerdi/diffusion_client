@@ -2,7 +2,6 @@ defmodule Diffusion.EventBus do
   alias Diffusion.Event
   alias Diffusion.Websocket.Protocol
 
-
   @doc """
   Subscribe to an event of type Event.t or a list of Event.t.
 
@@ -27,7 +26,7 @@ defmodule Diffusion.EventBus do
   end
 
   defp do_subscribe(event) do
-    :gproc.reg({:p, :l, {:diffusion_event, event}})
+    Registry.register(Diffusion.Registry, {:diffusion_event, event}, event)
     :ok
   end
 
@@ -47,12 +46,10 @@ defmodule Diffusion.EventBus do
   @spec publish(Event.t, Protocol.message) :: :ok
 
   def publish(event, message) do
-    try do
-      _ = :gproc.send({:p, :l, {:diffusion_event, event}}, {:diffusion_event, event, message})
-      :ok
-    rescue
-      _ -> :ok
-    end
+    Registry.dispatch(Diffusion.Registry, {:diffusion_event, event},
+      fn entries ->
+        Enum.each(entries, &(send elem(&1, 0), {:diffusion_event, event, message}))
+      end)
   end
 
 

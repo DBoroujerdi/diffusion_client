@@ -41,7 +41,10 @@ defmodule Diffusion.ServerStub do
   end
 
   def send_message(msg) do
-    :gproc.send({:p, :l, :stub_msg}, msg)
+    Registry.lookup(Diffusion.StubRegistry, :stub_msg)
+    |> Enum.each(fn {pid, _} ->
+      send pid, msg
+    end)
   end
 
   defp wait(time) do
@@ -61,7 +64,7 @@ defmodule WebsocketHandler do
 
   def websocket_init(state) do
     send state.owner, self()
-    :gproc.reg({:p, :l, :stub_msg})
+    Registry.register(Diffusion.StubRegistry, :stub_msg, :stub_msg)
     {:ok, state}
   end
 

@@ -10,21 +10,17 @@ defmodule Diffusion.EventBusTest do
 
       :ok = EventBus.publish(:foo_event, "bar_message")
 
-      receive do
-        {:diffusion_event, :foo_event, msg} -> assert msg == "bar_message"
-      after 1000
-          -> assert false
-      end
+      assert_receive({:diffusion_event, :foo_event, "bar_message"}, 1000)
     end
 
   end
 
   describe "sync receiving pubsub" do
     it "receives published message" do
-      :ok = EventBus.subscribe(:foo_event)
-      :ok = EventBus.publish(:foo_event, "bar_message")
+      :ok = EventBus.subscribe({:foo_event, "foo"})
+      :ok = EventBus.publish({:foo_event, "foo"}, "bar_message")
 
-      assert EventBus.receive_event(:foo_event) == "bar_message"
+      assert EventBus.receive_event({:foo_event, "foo"}) == "bar_message"
     end
 
     it "times out if no message received" do

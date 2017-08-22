@@ -16,8 +16,6 @@ defmodule Diffusion.TopicHandler do
   @callback topic_delta(topic, delta, state) :: {:ok, state}
 
 
-  # todo: a topic handler should timeout and die if no message has been recieved for a configurable time
-
   @doc false
   defmacro __using__(_) do
     quote do
@@ -28,7 +26,8 @@ defmodule Diffusion.TopicHandler do
       end
 
       defp via(name) do
-        {:via, :gproc, {:n, :l, {__MODULE__, name}}}
+        IO.inspect name
+        {:via, Registry, {Diffusion.Registry, name}}
       end
 
       def init(args) do

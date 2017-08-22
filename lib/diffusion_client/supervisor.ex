@@ -1,9 +1,13 @@
 require Logger
 
-defmodule Diffusion.Supervisor do
+defmodule Diffusion.Connections.Supervisor do
   alias Diffusion.ConnectionSup
 
   use Supervisor
+
+  @moduledoc """
+  Top level supervisor that supervises each connection supervisor.
+  """
 
 
   @spec start_link() :: Supervisor.on_start

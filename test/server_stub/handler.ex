@@ -9,7 +9,7 @@ defmodule Diffusion.Stub.WebsocketHandler do
 
   def websocket_init(state) do
     send state.owner, self()
-    :gproc.reg({:p, :l, :stub_msg})
+    Registry.register(Diffusion.StubRegistry, :stub_msg, :stub_msg)
     {:ok, state}
   end
 

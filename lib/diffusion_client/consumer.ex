@@ -14,11 +14,7 @@ defmodule Diffusion.ConsumerSup do
 
 
   def via(name) do
-    {:via, :gproc, key(name)}
-  end
-
-  def key(name) do
-    {:n, :l, {__MODULE__, name}}
+    {:via, Registry, {Diffusion.Registry, name}}
   end
 
   def init(config) do
@@ -52,25 +48,21 @@ defmodule Diffusion.Consumer do
 
 
   def via(name) do
-    {:via, :gproc, key(name)}
-  end
-
-  def key(name) do
-    {:n, :l, {__MODULE__, name}}
+    {:via, Registry, {Diffusion.Registry, name}}
   end
 
 
   @spec alive?(tuple) :: boolean
 
   def alive?(via) do
-    Process.alive?(:gproc.lookup_pid(via))
+    Process.whereis(via) != nil
   end
 
 
   @spec close(tuple) :: :ok
 
   def close(aka) do
-    send :gproc.lookup_pid(aka), :kill
+    send Process.whereis(aka), :kill
     :ok
   end
 
@@ -78,7 +70,7 @@ defmodule Diffusion.Consumer do
   @spec send_data(identifier, String.t) :: :ok when identifier: tuple | pid
 
   def send_data({:n, :l, _} = key, data) when is_binary(data) do
-    GenServer.cast({:via, :gproc, key}, {:send, data})
+    GenServer.cast({:via, Registry, key}, {:send, data})
   end
 
 
@@ -101,7 +93,7 @@ defmodule Diffusion.Consumer do
     case Websocket.open(state) do
       {:ok, socket} ->
         new_state = %{mref: Process.monitor(socket), socket: socket}
-        send state.owner, {:started, key(host)}
+        send state.owner, {:started, via(host)}
         {:noreply, Map.merge(state, new_state)}
       error ->
         send state.owner, error

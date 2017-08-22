@@ -16,13 +16,13 @@ defmodule Diffusion.Session do
     config = opts ++ [host: host, port: port, path: path, timeout: timeout, owner: self()]
     |> Enum.into(%{})
 
-    case Diffusion.Supervisor.start_socket_connection(config) do
+    case Diffusion.Connections.Supervisor.start_socket_connection(config) do
       {:ok, pid} ->
         receive do
           {:started, connection} ->
             {:ok, %Session{aka: connection, host: host, path: path}}
           error ->
-            Diffusion.Supervisor.stop_child(pid)
+            Diffusion.Connections.Supervisor.stop_child(pid)
             error
         after timeout
             -> {:error, :timeout}
@@ -35,15 +35,14 @@ defmodule Diffusion.Session do
   @spec alive?(Session.t) :: boolean
 
   def alive?(connection) do
-    pid = :gproc.lookup_pid(connection.aka)
-    Process.alive?(pid)
+    Process.alive? connection.aka
   end
 
 
   @spec close(Session.t) :: :ok | {:error, any}
 
   def close(connection) do
-    Diffusion.Supervisor.stop_child(connection)
+    Diffusion.Connections.Supervisor.stop_child(connection)
   end
 
 

@@ -4,6 +4,7 @@ defmodule Diffusion.Stub.Server do
   use GenServer
 
   def start() do
+    GenServer.start(Registry, [:unique, Diffusion.Registry])
     GenServer.start(__MODULE__, [], name: __MODULE__)
   end
 
@@ -41,6 +42,9 @@ defmodule Diffusion.Stub.Server do
   end
 
   def send_message(msg) do
-    :gproc.send({:p, :l, :stub_msg}, msg)
+    Registry.lookup(Diffusion.StubRegistry, :stub_msg)
+    |> Enum.each(fn {pid, _} ->
+      send pid, msg
+    end)
   end
 end

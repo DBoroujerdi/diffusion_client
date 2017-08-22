@@ -57,12 +57,20 @@ defmodule Diffusion.Client do
 
 
   def start(_, _) do
+    import Supervisor.Spec
+
     Logger.info "Starting DiffusionClient"
 
     # todo: support starting session and subscriptions
     # from config
 
-    Diffusion.Supervisor.start_link()
+    children = [
+      supervisor(Diffusion.Connections.Supervisor, []),
+      supervisor(Registry, [:unique, Diffusion.Registry])
+    ]
+
+    opts = [strategy: :one_for_one, name: Diffusion.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 
   ##

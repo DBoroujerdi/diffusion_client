@@ -13,11 +13,7 @@ defmodule Diffusion.ConnectionSup do
 
 
   def via(name) do
-    {:via, :gproc, key(name)}
-  end
-
-  def key(name) do
-    {:n, :l, {__MODULE__, name}}
+    {:via, Registry, {Diffusion.Registry, name}}
   end
 
 
