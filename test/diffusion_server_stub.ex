@@ -46,13 +46,6 @@ defmodule Diffusion.ServerStub do
       send pid, msg
     end)
   end
-
-  defp wait(time) do
-    receive do
-    after time
-        -> :ok
-    end
-  end
 end
 
 defmodule WebsocketHandler do

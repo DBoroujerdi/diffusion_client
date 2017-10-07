@@ -3,7 +3,6 @@ require Logger
 defmodule Diffusion.Client.Test do
   alias Diffusion.Client
   alias Diffusion.Stub.Server
-  alias Diffusion.Stub.WebsocketHandler
 
   use ExSpec, async: false
 
